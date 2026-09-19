@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#090b12" />
+    <meta name="color-scheme" content="dark" />
     <meta name="description" content="BrainDump — dein Gehirn außerhalb deines Kopfes." />
     <title>BrainDump — My Brain</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -81,51 +82,53 @@
           <div class="map-grid"></div>
           <div class="map-status"><span class="pulse-dot"></span><span>Live graph</span><span class="map-status-divider"></span><span id="visible-count">247 thoughts</span></div>
           <div class="map-hint"><span class="hint-key">Scroll</span> to zoom <span class="hint-sep">·</span> <span class="hint-key">Drag</span> to explore</div>
-          <svg class="connections" id="connections" viewBox="0 0 1000 650" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="lineBlue" x1="0" x2="1"><stop offset="0" stop-color="#79a9ff" stop-opacity=".16"/><stop offset=".5" stop-color="#75a4ff" stop-opacity=".72"/><stop offset="1" stop-color="#b28cff" stop-opacity=".2"/></linearGradient>
-              <linearGradient id="lineViolet" x1="0" x2="1"><stop offset="0" stop-color="#a181ff" stop-opacity=".18"/><stop offset=".5" stop-color="#bc91ff" stop-opacity=".72"/><stop offset="1" stop-color="#ffb28b" stop-opacity=".15"/></linearGradient>
-              <filter id="lineGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-            </defs>
-            <g class="connection-lines" id="connection-lines">
-              <path d="M500 325 C438 280 405 220 328 190" class="line blue-line" />
-              <path d="M500 325 C548 271 599 220 680 175" class="line blue-line" />
-              <path d="M500 325 C439 356 380 402 308 426" class="line violet-line" />
-              <path d="M500 325 C566 360 620 410 698 438" class="line violet-line" />
-              <path d="M328 190 C284 168 234 150 198 127" class="line blue-line soft-line" />
-              <path d="M328 190 C286 214 250 238 220 276" class="line blue-line soft-line" />
-              <path d="M680 175 C738 147 776 126 824 112" class="line blue-line soft-line" />
-              <path d="M680 175 C730 210 766 244 808 277" class="line blue-line soft-line" />
-              <path d="M308 426 C255 448 219 482 185 526" class="line violet-line soft-line" />
-              <path d="M308 426 C263 400 216 392 165 400" class="line violet-line soft-line" />
-              <path d="M698 438 C756 458 802 482 836 522" class="line violet-line soft-line" />
-              <path d="M698 438 C752 415 794 397 850 393" class="line violet-line soft-line" />
-              <path d="M220 276 C197 304 178 337 165 400" class="line blue-line faint-line" />
-              <path d="M808 277 C830 312 842 351 850 393" class="line blue-line faint-line" />
-              <path d="M185 526 C230 555 278 572 324 578" class="line violet-line faint-line" />
-              <path d="M836 522 C796 553 758 570 704 579" class="line violet-line faint-line" />
-              <path d="M324 578 C415 600 593 603 704 579" class="line violet-line faint-line" />
-              <circle class="particle p1" r="2.4"><animateMotion dur="6s" repeatCount="indefinite" path="M500 325 C438 280 405 220 328 190"/></circle>
-              <circle class="particle p2" r="2"><animateMotion dur="7s" repeatCount="indefinite" path="M500 325 C566 360 620 410 698 438"/></circle>
-              <circle class="particle p3" r="1.8"><animateMotion dur="5.5s" repeatCount="indefinite" path="M680 175 C730 210 766 244 808 277"/></circle>
-              <circle class="particle p4" r="1.7"><animateMotion dur="8s" repeatCount="indefinite" path="M185 526 C230 555 278 572 324 578"/></circle>
-            </g>
-          </svg>
+          <div class="map-viewport" id="map-viewport">
+            <svg class="connections" id="connections" viewBox="0 0 1000 650" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="lineBlue" x1="0" x2="1"><stop offset="0" stop-color="#79a9ff" stop-opacity=".16"/><stop offset=".5" stop-color="#75a4ff" stop-opacity=".72"/><stop offset="1" stop-color="#b28cff" stop-opacity=".2"/></linearGradient>
+                <linearGradient id="lineViolet" x1="0" x2="1"><stop offset="0" stop-color="#a181ff" stop-opacity=".18"/><stop offset=".5" stop-color="#bc91ff" stop-opacity=".72"/><stop offset="1" stop-color="#ffb28b" stop-opacity=".15"/></linearGradient>
+                <filter id="lineGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <g class="connection-lines" id="connection-lines">
+                <path d="M500 325 C438 280 405 220 328 190" class="line blue-line" />
+                <path d="M500 325 C548 271 599 220 680 175" class="line blue-line" />
+                <path d="M500 325 C439 356 380 402 308 426" class="line violet-line" />
+                <path d="M500 325 C566 360 620 410 698 438" class="line violet-line" />
+                <path d="M328 190 C284 168 234 150 198 127" class="line blue-line soft-line" />
+                <path d="M328 190 C286 214 250 238 220 276" class="line blue-line soft-line" />
+                <path d="M680 175 C738 147 776 126 824 112" class="line blue-line soft-line" />
+                <path d="M680 175 C730 210 766 244 808 277" class="line blue-line soft-line" />
+                <path d="M308 426 C250 438 190 446 130 468" class="line violet-line soft-line" />
+                <path d="M308 426 C263 400 216 392 165 400" class="line violet-line soft-line" />
+                <path d="M698 438 C756 452 812 466 860 486" class="line violet-line soft-line" />
+                <path d="M698 438 C752 415 794 397 850 393" class="line violet-line soft-line" />
+                <path d="M220 276 C197 304 178 337 165 400" class="line blue-line faint-line" />
+                <path d="M808 277 C830 312 842 351 850 393" class="line blue-line faint-line" />
+                <path d="M130 468 C180 540 250 570 324 578" class="line violet-line faint-line" />
+                <path d="M860 486 C820 540 770 570 704 579" class="line violet-line faint-line" />
+                <path d="M324 578 C415 600 593 603 704 579" class="line violet-line faint-line" />
+                <circle class="particle p1" r="2.4"><animateMotion dur="6s" repeatCount="indefinite" path="M500 325 C438 280 405 220 328 190"/></circle>
+                <circle class="particle p2" r="2"><animateMotion dur="7s" repeatCount="indefinite" path="M500 325 C566 360 620 410 698 438"/></circle>
+                <circle class="particle p3" r="1.8"><animateMotion dur="5.5s" repeatCount="indefinite" path="M680 175 C730 210 766 244 808 277"/></circle>
+                <circle class="particle p4" r="1.7"><animateMotion dur="8s" repeatCount="indefinite" path="M130 468 C180 540 250 570 324 578"/></circle>
+              </g>
+            </svg>
 
-          <div class="node-layer" id="node-layer">
-            <button class="brain-core" data-node-id="core" aria-label="My Brain, 247 Gedanken"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-symbol">✣</span><strong>MY BRAIN</strong><small>247 thoughts</small></button>
-            <button class="thought-node node-school" data-node-id="school"><span class="node-halo"></span><span class="node-icon">◒</span><strong>School</strong><small>32 thoughts</small><em class="node-ring"></em></button>
-            <button class="thought-node node-coding" data-node-id="coding"><span class="node-halo"></span><span class="node-icon">⌁</span><strong>Coding</strong><small>18 thoughts</small><em class="node-ring"></em></button>
-            <button class="thought-node node-personal" data-node-id="personal"><span class="node-halo"></span><span class="node-icon">♧</span><strong>Personal</strong><small>12 thoughts</small><em class="node-ring"></em></button>
-            <button class="thought-node node-ideas" data-node-id="ideas"><span class="node-halo"></span><span class="node-icon">✦</span><strong>Ideas</strong><small>24 thoughts</small><em class="node-ring"></em></button>
-            <button class="thought-node small-node node-math" data-node-id="math"><span class="node-halo"></span><span class="node-icon">∑</span><strong>Math exam</strong><small>tomorrow</small><em class="deadline-ring"></em></button>
-            <button class="thought-node small-node node-english" data-node-id="english"><span class="node-halo"></span><span class="node-icon">Aa</span><strong>English</strong><small>Friday</small></button>
-            <button class="thought-node small-node node-website" data-node-id="website"><span class="node-halo"></span><span class="node-icon">⌘</span><strong>Website</strong><small>80% done</small><em class="active-ring"></em></button>
-            <button class="thought-node small-node node-godot" data-node-id="godot"><span class="node-halo"></span><span class="node-icon">▱</span><strong>Godot</strong><small>7 thoughts</small></button>
-            <button class="thought-node tiny-node node-hotel" data-node-id="hotel"><span class="node-icon">⌂</span><strong>Hotel</strong></button>
-            <button class="thought-node tiny-node node-budget" data-node-id="budget"><span class="node-icon">€</span><strong>Budget</strong></button>
-            <button class="thought-node tiny-node node-training" data-node-id="training"><span class="node-icon">↗</span><strong>Training</strong></button>
-            <button class="thought-node tiny-node node-travel" data-node-id="travel"><span class="node-icon">✈</span><strong>Travel</strong></button>
+            <div class="node-layer" id="node-layer">
+              <button class="brain-core" data-node-id="core" aria-label="My Brain, 247 Gedanken"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-symbol">✣</span><strong>MY BRAIN</strong><small>247 thoughts</small></button>
+              <button class="thought-node node-school" data-node-id="school"><span class="node-halo"></span><span class="node-icon">◒</span><strong>School</strong><small>32 thoughts</small><em class="node-ring"></em></button>
+              <button class="thought-node node-coding" data-node-id="coding"><span class="node-halo"></span><span class="node-icon">⌁</span><strong>Coding</strong><small>18 thoughts</small><em class="node-ring"></em></button>
+              <button class="thought-node node-personal" data-node-id="personal"><span class="node-halo"></span><span class="node-icon">♧</span><strong>Personal</strong><small>12 thoughts</small><em class="node-ring"></em></button>
+              <button class="thought-node node-ideas" data-node-id="ideas"><span class="node-halo"></span><span class="node-icon">✦</span><strong>Ideas</strong><small>24 thoughts</small><em class="node-ring"></em></button>
+              <button class="thought-node small-node node-math" data-node-id="math"><span class="node-halo"></span><span class="node-icon">∑</span><strong>Math exam</strong><small>tomorrow</small><em class="deadline-ring"></em></button>
+              <button class="thought-node small-node node-english" data-node-id="english"><span class="node-halo"></span><span class="node-icon">Aa</span><strong>English</strong><small>Friday</small></button>
+              <button class="thought-node small-node node-website" data-node-id="website"><span class="node-halo"></span><span class="node-icon">⌘</span><strong>Website</strong><small>80% done</small><em class="active-ring"></em></button>
+              <button class="thought-node small-node node-godot" data-node-id="godot"><span class="node-halo"></span><span class="node-icon">▱</span><strong>Godot</strong><small>7 thoughts</small></button>
+              <button class="thought-node tiny-node node-hotel" data-node-id="hotel"><span class="node-icon">⌂</span><strong>Hotel</strong></button>
+              <button class="thought-node tiny-node node-budget" data-node-id="budget"><span class="node-icon">€</span><strong>Budget</strong></button>
+              <button class="thought-node tiny-node node-training" data-node-id="training"><span class="node-icon">↗</span><strong>Training</strong></button>
+              <button class="thought-node tiny-node node-travel" data-node-id="travel"><span class="node-icon">✈</span><strong>Travel</strong></button>
+            </div>
           </div>
 
           <div class="map-legend"><span class="legend-title">NODE STATUS</span><span><i class="legend-dot active"></i> Active</span><span><i class="legend-dot deadline"></i> Deadline soon</span><span><i class="legend-dot connected"></i> Connected</span></div>
