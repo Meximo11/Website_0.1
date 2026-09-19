@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#14120f" />
     <meta name="color-scheme" content="dark" />
-    <meta name="description" content="A local-first memory room: write a memory down and it lands as a node in a small 3D brain. Nothing is uploaded, nothing is invented." />
+    <meta name="description" content="A local-first memory room: every memory you write becomes a node in your own growing neural brain. It starts empty. Nothing is uploaded, nothing is invented." />
     <title>My brain · BrainDump</title>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="BrainDump" />
     <meta property="og:title" content="BrainDump: memories, kept on your own brain" />
-    <meta property="og:description" content="A local-first memory room. Write a memory down and it lands as a node in a small 3D brain. Nothing leaves your device." />
+    <meta property="og:description" content="A local-first memory room. Every memory you write becomes a node in your own growing neural brain. Nothing leaves your device." />
     <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="BrainDump: memories, kept on your own brain" />
-    <meta name="twitter:description" content="A local-first memory room. Write a memory down and it lands as a node in a small 3D brain." />
+    <meta name="twitter:description" content="A local-first memory room. Every memory you write becomes a node in your own growing neural brain." />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="preload" href="fonts/dm-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
@@ -83,7 +83,7 @@
 
     <div class="about-pop" id="about-pop" role="dialog" aria-label="About BrainDump" hidden>
       <h3>BrainDump</h3>
-      <p>A small, local-first home for the memories you want to keep. Write one down and it gets a node in the brain. This brain starts empty on purpose: it only shows what you stored, nothing invented.</p>
+      <p>A small, local-first home for the memories you want to keep. This brain starts empty on purpose: your first memory lights its single neuron, and every memory after it grows a new node and new links. It only ever shows what you stored, nothing invented.</p>
       <dl class="shortcut-list">
         <div><dt>Search</dt><dd><kbd>/</kbd></dd></div>
         <div><dt>New memory</dt><dd><kbd>N</kbd></dd></div>
@@ -119,7 +119,7 @@
         </footer>
       </aside>
 
-      <section class="stage" id="brain-stage" tabindex="-1" aria-label="The brain, one node per memory">
+      <section class="stage" id="brain-stage" tabindex="-1" aria-label="The brain: one neuron per memory. Drag to spin.">
         <div class="brain-field" id="brain-field">
           <div class="brain-layer" id="brain-3d-layer"></div>
           <div class="memory-markers" id="memory-markers"></div>
@@ -127,7 +127,7 @@
         <div class="stage-empty" id="stage-empty" hidden>
           <p class="eyebrow"><i class="eyebrow-dot" aria-hidden="true"></i>Quiet in here</p>
           <h1>Nothing stored yet.</h1>
-          <p>Add your first memory below and the brain will light up with it.</p>
+          <p>Add your first memory below. It becomes the seed neuron; the brain grows around everything you keep.</p>
         </div>
       </section>
     </main>
@@ -140,7 +140,7 @@
           <span class="send-inner" aria-hidden="true"><svg class="icon"><use href="#i-paper-plane"></use></svg></span>
         </button>
       </div>
-      <p class="composer-hint">Stored on this device only &middot; Enter saves &middot; drag on the brain to orbit</p>
+      <p class="composer-hint">Stored on this device only &middot; Enter saves &middot; drag anywhere to spin the brain</p>
     </form>
 
     <aside class="panel" id="memory-panel" aria-label="Memory details" aria-hidden="true">

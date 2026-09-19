@@ -8,8 +8,8 @@ BrainDump is a local-first memory room. You write down what is worth keeping; ea
 
 A zero-build static app, served straight from the repository:
 
-- the **living 3D brain** (Three.js): wrinkled hemispheres, cerebellum and stem made of ~2,500 drifting points in a warm bone/slate palette with a few live ember synapses; it breathes, follows the pointer, and pulses when you store something
-- **memories as brain nodes**: every saved memory is anchored to a deterministic point on the brain surface; nodes project onto the canvas each frame, go quiet when the brain turns them to the back, and rotate into view when you pick the memory in the list
+- the brain is the memory list, not a decoration: **at the start there is no brain**; each memory plants one neuron into a deterministic blueprint of a brain-shaped network (oldest = seed at the core, later ones spread the silhouette), linked to the nearest earlier node, so the structure grows toward a brain as you keep it; the network breathes, spins slowly, pulses when you store something, and links carry the occasional travelling signal
+- **fixed in the centre, spun by hand**: drag anywhere (mouse or finger) to rotate the brain with spring-follow and inertia; no pan, no zoom; nodes go quiet when they turn to the back and rotate into view when you pick the memory in the list
 - **graceful tiers** for the brain: WebGL, then a software-projected Canvas 2D version, then a CSS aura with a ring layout, so there is never a broken state; `?brain=webgl|2d|css` forces a tier
 - **capture-first composer**: one box, Enter stores, first line becomes the title, the rest the note body
 - **memory list** with relative dates, live search (filters list and dims non-matching nodes), and inline empty states
@@ -48,7 +48,7 @@ choreography. Everything else, fonts and icons included, ships in the repository
 | `index.html` | markup and the Phosphor icon sprite (`<symbol id="i-…">`) |
 | `styles.css` | tokens and the full interface: topbar, rail, brain stage, memory nodes, composer, panel, toast, responsive rules |
 | `app.js` | memory store (localStorage), rail, markers, search, panel editing, export/import; talks to the brain via `braindump:*` DOM events |
-| `brain-3d.js` | the three brain tiers, the memory anchor projection and `BrainDump3D` (pulse/burst/focus/face/transform) |
+| `brain-3d.js` | the emergent memory network, drag-to-spin, the three render tiers and `BrainDump3D` (pulse/burst/focus/face/debug) |
 | `favicon.svg` | the four-dot brand mark as a scalable favicon |
 | `fonts/` | self-hosted Latin variable-weight subsets of Fraunces, DM Sans and Space Grotesk (woff2) plus the OFL licence |
 | `DESIGN.md` | AI-readable design system (tokens, type, motion, brain palette, do/don't) plus curated references |

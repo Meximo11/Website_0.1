@@ -103,32 +103,48 @@ warm radial glows (amber from top, ember from bottom), maximum 5% alpha.
 
 - Easing: `cubic-bezier(.32,.72,0,1)` for entrances, `( .45,0,.15,1)` for
   breathing loops. No `ease-in-out` defaults.
-- Durations: hovers 0.2s, panels 0.4–0.55s, brain intro ~2.2s.
-- The brain owns ambient motion: breath (1.8% scale sine), pointer parallax,
-  travelling signals, pulse on save, burst on the very first memory.
+- Durations: hovers 0.2s, panels 0.4–0.55s, brain intro ~1.6s.
+- The brain owns ambient motion: breath (1.8% scale sine), a slow idle spin
+  (0.055 rad/s), travelling signals, pulse on save, burst on the very first
+  memory. Drag anywhere on the stage to spin the network by hand (spring
+  follow plus release inertia); there is no pan and no zoom: the brain holds
+  the exact centre of the layout.
 - A node appearing runs one `node-bloom` ring expansion (1.1s), then stops;
   persistent blinking is banned.
 - Selecting from the rail rotates the brain toward the node (`face`) and
-  dims the brain (focus 0.42) so the node and panel read first.
+  dims the brain (focus 0.62) so the node and panel read first.
 - GSAP is optional choreography; CSS transitions are the floor. Every
   animation sits behind `prefers-reduced-motion`.
 
 ## 7. The brain (three tiers)
 
-1. **WebGL** (Three.js 0.160 from CDN): point cloud + custom shader for
-   twinkle, line segments for synapses, sprites for glow/core.
-2. **Canvas 2D**: same geometry, software projection at 30fps.
-3. **CSS aura**: radial-gradient glow, no canvas; memory markers arrange
-   on a golden-angle ring so the app stays fully usable.
+The brain is the memory list drawn as a neural network. There is no
+decorative brain without memories: the stage is literally empty until the
+first memory lights the seed neuron (slot 0 sits at the centroid). A
+deterministic farthest-point ordering of a brain-shaped point cloud (two
+hemispheres, inner neurons, cerebellum, stem) is the blueprint; memory k
+owns slot k, so the silhouette spreads outward as the collection grows.
+Every slot links to its parent (the nearest earlier slot), which keeps the
+graph one connected piece, and deleting an old memory shifts the rest by
+one slot — they ease into their new places instead of teleporting.
+
+1. **WebGL** (Three.js 0.160 from CDN): shader points with twinkle, ember
+   flash on birth and a selection tint; one line segment per memory after
+   the first; signals only travel along visible links; the warm glow fades
+   in with density (`min(1, visible / 24)`).
+2. **Canvas 2D**: same network and arrays, software projection at 30fps.
+3. **CSS aura**: no canvas; markers arrange on a golden-angle ring so the
+   app stays fully usable.
 
 `body[data-brain-mode]` announces the tier; `window.BrainDump3D` exposes
-`pulse(color, strength)`, `burst(color)`, `setFocus(active)`, `face(id)`,
-`setTransform(x, y, zoom)`. The app side speaks only through
-`braindump:*` CustomEvents (`anchors`, `project`, `pulse`, `burst`, `focus`,
-`face`, `transform`); memory anchors are deterministic: `hash(memory id) %
-surfaceCount`, so the same memory always sits on the same spot of the
-cortex. Nodes on the far side get `is-back` (12% opacity, not clickable);
-rotating the brain brings them around.
+`pulse(color, strength)`, `burst(color)`, `setFocus(active)`, `face(id)`
+and `debug` (mode / memories / visible / yaw / tilt). The app side speaks
+only through `braindump:*` CustomEvents: `anchors` with the memory ids
+**oldest-first**, `select`, `dim` (search), plus `project`, `pulse`,
+`burst`, `focus`, `face`. Beyond the blueprint capacity (1,790 slots in
+WebGL, 770 in the 2D tier) slots wrap and two memories may share one
+position. Nodes on the far side get `is-back` (12% opacity, not
+clickable); spinning the brain brings them around.
 
 ## 8. Layout
 
@@ -184,6 +200,13 @@ rotating the brain brings them around.
 
 ## 12. Changelog (design)
 
+- **2026-09-19, emergent structure**: the always-on particle ball is gone —
+  the network IS the memories (seed neuron, birth-order slots, parent
+  links), replacing id-hash anchoring on a decorative cortex; drag-to-spin
+  with inertia replaces pointer parallax; map-style zoom/pan is removed and
+  the brain is fixed in the centre; selection and search now reach the
+  canvas (highlight, dim); the layout row is clamped to `100dvh` so a long
+  rail list can never push the brain below its own centre.
 - **2026-09-19, "memory room" rebuild**: whole UI rewritten. The mind-map
   layer (CSS nodes, SVG connections, fake 247-count) is deleted; the 3D
   brain becomes the interface and every node is a real stored memory.
