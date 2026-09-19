@@ -1,33 +1,35 @@
 # BrainDump
 
-**Write first. Organize later.**
+**Your memories, one node each.**
 
-BrainDump is a local-first concept for a visual operating system for thoughts. Instead of forcing structure during capture, the app starts with a living knowledge graph and turns unstructured notes into connected thoughts, projects, and next actions.
+BrainDump is a local-first memory room. You write down what is worth keeping; each memory becomes a glowing node anchored to a small 3D brain. Nothing is uploaded and nothing is invented: the app ships with an empty brain on purpose. No demo data, no sample thoughts, no fake counters. The brain only shows what you typed.
 
 ## What is implemented
 
-The current V1 prototype is a zero-build static app that runs directly in the browser:
+A zero-build static app, served straight from the repository:
 
-- interactive neural brain map with animated connections and particles
-- a living **3D neural brain** at the centre of the map (Three.js): two wrinkled hemispheres, cerebellum and stem built from ~2,500 glowing neurons, synapse links and travelling signals; it breathes, follows the pointer, pulses in the colour of the thought you select and bursts when a new thought enters
-- **graceful fallbacks** for the brain: a software-projected Canvas 2D version when WebGL or the CDN is unavailable, and a pure CSS core when even canvas is missing
-- **GSAP motion layer**: staged entrance (sidebar → map → lines drawing in → nodes popping → composer → panel), animated counters, node and panel pulses on selection, smooth zoom tweens, modal choreography, and a gentle shake when you try to send an empty dump — everything degrades to plain CSS transitions if GSAP is not loaded and respects `prefers-reduced-motion`
-- core spaces for School, Coding, Personal, and Ideas
-- selectable thoughts with a detail panel, progress, tasks, notes, deadlines, and connections
-- brain dump composer with sentence-based thought counting
-- local thought count persistence through `localStorage`
-- search with `⌘ K`, zoom controls, mouse-wheel zoom, and drag-to-explore map movement
-- Neural / Clusters views, history states, active filters, and Focus mode
-- “Next best move” modal to reduce decision overload
-- AI suggestion preview with explicit review / ignore behavior
-- responsive layout for a compact tablet / mobile view (the detail panel becomes an overlay, the composer gets its own strip below the map)
-- local-storage status shown as a first-class privacy affordance
-- inline editing everywhere: quick-add row for tasks, in-place notes editor, and a composed empty state when a search matches nothing (no native `prompt()` dialogs)
-- **Phosphor icons** (inline SVG sprite, MIT) instead of unicode glyphs, self-hosted **DM Sans / Space Grotesk**, favicon and Open Graph meta, a skip link and accent-coloured focus rings
+- the **living 3D brain** (Three.js): wrinkled hemispheres, cerebellum and stem made of ~2,500 drifting points in a warm bone/slate palette with a few live ember synapses; it breathes, follows the pointer, and pulses when you store something
+- **memories as brain nodes**: every saved memory is anchored to a deterministic point on the brain surface; nodes project onto the canvas each frame, go quiet when the brain turns them to the back, and rotate into view when you pick the memory in the list
+- **graceful tiers** for the brain: WebGL, then a software-projected Canvas 2D version, then a CSS aura with a ring layout, so there is never a broken state; `?brain=webgl|2d|css` forces a tier
+- **capture-first composer**: one box, Enter stores, first line becomes the title, the rest the note body
+- **memory list** with relative dates, live search (filters list and dims non-matching nodes), and inline empty states
+- **detail panel** with inline editing (autosaved), created/updated times, two-step delete and undo from the toast
+- **export / import** as plain JSON so your data is never trapped
+- optional **GSAP choreography** (staggered entrance, gentle pulses) that degrades to plain CSS transitions and honours `prefers-reduced-motion`
+- keyboard shortcuts: `/` search, `N` new memory, `Esc` close, `?` about
+- localStorage persistence, `body[data-brain-mode]` tier reporting
+- self-hosted **Fraunces / DM Sans / Space Grotesk** variable fonts, Phosphor icon sprite, favicon and Open Graph meta, skip link, accent focus rings, 44 px touch targets, forced-colors support
+- responsive: three-pane desktop, drawer list and bottom-sheet panel on small screens
+
+## Look
+
+Warm graphite (`#14120f`), bone text, a single ember accent held back for memory
+nodes, the composer button and selection. No purple gradients, no glassmorphism
+confetti, no stock-hero glow. Details in [DESIGN.md](DESIGN.md).
 
 ## Run locally
 
-No build step is required. Serve the repository with any static server, for example:
+No build step. Serve the repository with any static server:
 
 ```bash
 python3 -m http.server 4173
@@ -35,21 +37,23 @@ python3 -m http.server 4173
 
 Then open `http://localhost:4173`.
 
-Three.js and GSAP are loaded on demand from jsDelivr (with an unpkg fallback). Fonts and icons ship with the repository, so without network access the app still looks the same: the brain switches to the 2D canvas renderer and the interface simply skips the GSAP choreography.
+Three.js and GSAP load from jsDelivr with an unpkg fallback. Both are optional: without
+network access the brain switches to the 2D tier and the interface simply skips the GSAP
+choreography. Everything else, fonts and icons included, ships in the repository.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `index.html` | markup, the Phosphor icon sprite (`<symbol id="i-…">`), SVG connection lines, script loading |
-| `styles.css` | the complete colour system, layout, nodes, panels, modal, toast, responsive rules |
-| `app.js` | interaction layer + GSAP motion; talks to the brain via `braindump:*` DOM events |
-| `brain-3d.js` | the 3D brain (Three.js), the Canvas 2D fallback and the CSS fallback switch |
+| `index.html` | markup and the Phosphor icon sprite (`<symbol id="i-…">`) |
+| `styles.css` | tokens and the full interface: topbar, rail, brain stage, memory nodes, composer, panel, toast, responsive rules |
+| `app.js` | memory store (localStorage), rail, markers, search, panel editing, export/import; talks to the brain via `braindump:*` DOM events |
+| `brain-3d.js` | the three brain tiers, the memory anchor projection and `BrainDump3D` (pulse/burst/focus/face/transform) |
 | `favicon.svg` | the four-dot brand mark as a scalable favicon |
-| `fonts/` | self-hosted Latin variable-weight subsets of DM Sans and Space Grotesk (woff2) plus the OFL licence |
-| `DESIGN.md` | AI-readable design system (tokens, type, motion, do/don't) plus curated design references and open-source repos to borrow from, with a prioritised UI backlog |
-| `AGENTS.md` / `CLAUDE.md` | guidance for AI coding agents: working rules, the skills inventory and the tools that need a machine-level install (gstack, Understand Anything, graphify) |
-| `.agents/skills/`, `skills-lock.json` | vendored agent skills (taste-skill, frontend-design, stop-slop, playwright-cli, graphify, last30days, Remotion, HyperFrames core set) pinned by source and content hash |
+| `fonts/` | self-hosted Latin variable-weight subsets of Fraunces, DM Sans and Space Grotesk (woff2) plus the OFL licence |
+| `DESIGN.md` | AI-readable design system (tokens, type, motion, brain palette, do/don't) plus curated references |
+| `AGENTS.md` / `CLAUDE.md` | agent guidance: working rules, the skills inventory and machine-level tool installs |
+| `.agents/skills/`, `skills-lock.json` | vendored agent skills (taste-skill set, frontend-design, stop-slop, playwright-cli, graphify, last30days, Remotion, HyperFrames core set) pinned by source and content hash |
 
 ### Testing the brain tiers
 
@@ -57,10 +61,15 @@ Append a query parameter to force a renderer:
 
 - `?brain=webgl` — Three.js (default when WebGL is available)
 - `?brain=2d` — Canvas 2D fallback
-- `?brain=css` — CSS core only
+- `?brain=css` — CSS aura only
 
 The active tier is exposed as `body[data-brain-mode]` and through `window.BrainDump3D.mode`.
 
 ## Product direction
 
-The most important product principle is **capture before organization**. AI should remain a quiet tool that suggests groups, relations, tasks, and summaries; the user always approves changes. The next product layer would add a real graph data model, IndexedDB persistence, import/export, undoable AI suggestions, and optional local inference through Ollama or LM Studio.
+The one product rule: **the brain only ever shows memories the user wrote**.
+The next layers could add photo or voice capture per memory, mood or tag dots
+(kept to semantic state), a weekly "what did you keep?" digest, IndexedDB
+persistence with undo history, and optional on-device search through
+Ollama or LM Studio. Whatever gets built stays seeded-empty; sample data is
+the fastest way to make this look like an AI demo.

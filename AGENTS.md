@@ -5,11 +5,12 @@ working in this repository. Claude Code reads `CLAUDE.md`, which imports this fi
 
 ## Project in one paragraph
 
-BrainDump is a zero-build static prototype: `index.html`, `styles.css`, `app.js`
-and `brain-3d.js`, served by any static server (`python3 -m http.server 4173`).
-No bundler, no framework, no package.json. The design system lives in `DESIGN.md`
-(tokens, type, motion, iconography, do / don't); keep it in sync with `styles.css`
-and the `PALETTE` in `brain-3d.js` when you change one of them.
+BrainDump is a local-first memory room: every memory the user writes becomes a
+node anchored on a small 3D brain. It is a zero-build static prototype
+(`index.html`, `styles.css`, `app.js`, `brain-3d.js`) served by any static server
+(`python3 -m http.server 4173`). No bundler, no framework, no package.json. The
+design system lives in `DESIGN.md`; keep it in sync with the tokens in
+`styles.css` and the `PALETTE` in `brain-3d.js` when you change one of them.
 
 ## Working rules
 
@@ -19,6 +20,10 @@ and the `PALETTE` in `brain-3d.js` when you change one of them.
   `prefers-reduced-motion` path.
 - Interface copy is English, sentence case, no em-dashes. Icons come from the
   Phosphor sprite in `index.html`, never from unicode glyphs.
+- Never seed demo memories, sample nodes or fake counters. An empty store
+  (and the designed empty state) is the honest default; the brain only shows
+  memories the user stored. The look is warm graphite + bone + a single ember
+  accent; violet/purple is banned (this was the explicit 2026-09 pivot).
 - Small, reviewable commits with a body that explains why.
 - Verify in a browser when you can (`playwright-cli` skill); otherwise at least run
   the app in jsdom and check that `app.js` parses.
@@ -34,7 +39,9 @@ expose them to a specific tool as well (for example `.claude/skills/`), run
 | Skill | Source | Use it for |
 | --- | --- | --- |
 | `design-taste-frontend` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | anti-slop frontend work: brief inference, design dials, AI-tell bans, pre-flight check |
-| `redesign-existing-projects` | Leonxlnx/taste-skill | audit-first upgrades of an existing UI without breaking functionality (the skill behind the 2026-09 redesign pass) |
+| `redesign-existing-projects` | Leonxlnx/taste-skill | audit-first upgrades of an existing UI without breaking functionality (used for the 2026-09 rebuild) |
+| `high-end-visual-design` | Leonxlnx/taste-skill | agency-grade spacing, double-bezel surfaces, custom easing, anti-cheap defaults (drove the memory-room rebuild) |
+| `minimalist-ui` | Leonxlnx/taste-skill | warm editorial monochrome, flat grids, no gradient noise |
 | `frontend-design` | [anthropics/skills](https://github.com/anthropics/skills) | Anthropic's guidance for distinctive, intentional visual design |
 | `stop-slop` | [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) | strip AI writing patterns from copy, docs and commit messages |
 | `playwright-cli` | [@playwright/cli](https://www.npmjs.com/package/@playwright/cli) | drive a real browser: snapshots, clicks, screenshots, traces, test generation |
