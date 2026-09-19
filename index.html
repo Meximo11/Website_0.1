@@ -1,20 +1,30 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#090b12" />
     <meta name="color-scheme" content="dark" />
-    <meta name="description" content="BrainDump — dein Gehirn außerhalb deines Kopfes." />
-    <title>BrainDump — My Brain</title>
+    <meta name="description" content="BrainDump is a local-first, visual home for everything you think about. Write first, organize later." />
+    <title>My Brain · BrainDump</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BrainDump" />
+    <meta property="og:title" content="BrainDump: your brain, outside your head" />
+    <meta property="og:description" content="A local-first, visual home for everything you think about. Write first, organize later." />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="BrainDump: your brain, outside your head" />
+    <meta name="twitter:description" content="A local-first, visual home for everything you think about. Write first, organize later." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#brain-stage">Skip to the brain map</a>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Hauptnavigation">
+      <aside class="sidebar" aria-label="Main navigation">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></div>
           <div><strong>Brain<span>Dump</span></strong><small>think freely</small></div>
@@ -28,7 +38,7 @@
           <button class="nav-item" data-view="archive"><span class="nav-icon">▤</span><span>Archive</span></button>
         </nav>
 
-        <div class="workspace-label space-top">YOUR SPACES <button class="tiny-plus" id="add-space" aria-label="Space hinzufügen">+</button></div>
+        <div class="workspace-label space-top">YOUR SPACES <button class="tiny-plus" id="add-space" aria-label="Add a space">+</button></div>
         <div class="space-list">
           <button class="space-item" data-space="School"><span class="space-dot blue"></span>School <small>32</small></button>
           <button class="space-item" data-space="Coding"><span class="space-dot violet"></span>Coding <small>18</small></button>
@@ -40,8 +50,8 @@
           <button class="nav-item subtle" id="settings-button"><span class="nav-icon">⚙</span><span>Settings</span></button>
           <div class="profile-card">
             <div class="avatar">M</div>
-            <div class="profile-copy"><strong>Max Mustermann</strong><small>Local workspace</small></div>
-            <button class="more-button" aria-label="Mehr Optionen">•••</button>
+            <div class="profile-copy"><strong>Max Brandl</strong><small>Local workspace</small></div>
+            <button class="more-button" aria-label="More options">•••</button>
           </div>
           <div class="local-badge"><span class="status-dot"></span><span>Stored locally</span><span class="lock">⌑</span></div>
         </div>
@@ -55,15 +65,15 @@
           </div>
           <div class="top-actions">
             <label class="search-box" for="search-input"><span>⌕</span><input id="search-input" type="search" placeholder="Search your brain..." /><kbd>⌘ K</kbd></label>
-            <button class="icon-button" id="notifications-button" aria-label="Benachrichtigungen"><span class="notification-dot"></span>♢</button>
-            <button class="help-button" id="help-button" aria-label="Hilfe">?</button>
+            <button class="icon-button" id="notifications-button" aria-label="Notifications"><span class="notification-dot"></span>♢</button>
+            <button class="help-button" id="help-button" aria-label="Help">?</button>
             <button class="top-avatar">M</button>
           </div>
         </header>
 
         <section class="map-toolbar" aria-label="Map controls">
           <div class="toolbar-left">
-            <div class="view-switcher" role="tablist" aria-label="Ansicht">
+            <div class="view-switcher" role="tablist" aria-label="View">
               <button class="view-tab active" data-map-mode="neural"><span>✣</span> Neural</button>
               <button class="view-tab" data-map-mode="clusters"><span>◌</span> Clusters</button>
             </div>
@@ -72,12 +82,12 @@
           </div>
           <div class="toolbar-right">
             <button class="history-button" id="history-button"><span>◷</span> <span id="history-label">Today</span> <span class="chevron">⌄</span></button>
-            <div class="zoom-controls"><button id="zoom-out" aria-label="Verkleinern">−</button><span id="zoom-level">100%</span><button id="zoom-in" aria-label="Vergrößern">+</button></div>
+            <div class="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-level">100%</span><button id="zoom-in" aria-label="Zoom in">+</button></div>
             <button class="focus-button" id="focus-button"><span>◎</span> Focus mode</button>
           </div>
         </section>
 
-        <section class="brain-stage" id="brain-stage" aria-label="Interaktive Brain Map">
+        <section class="brain-stage" id="brain-stage" aria-label="Interactive brain map">
           <div class="stage-glow glow-one"></div><div class="stage-glow glow-two"></div>
           <div class="map-grid"></div>
           <div class="map-status"><span class="pulse-dot"></span><span>Live graph</span><span class="map-status-divider"></span><span id="visible-count">247 thoughts</span></div>
@@ -117,7 +127,7 @@
             <div class="brain-3d-layer" id="brain-3d-layer" aria-hidden="true"></div>
 
             <div class="node-layer" id="node-layer">
-              <button class="brain-core" data-node-id="core" aria-label="My Brain, 247 Gedanken"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-symbol">✣</span><strong>MY BRAIN</strong><small>247 thoughts</small></button>
+              <button class="brain-core" data-node-id="core" aria-label="My Brain, 247 thoughts"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-symbol">✣</span><strong>MY BRAIN</strong><small>247 thoughts</small></button>
               <button class="thought-node node-school" data-node-id="school"><span class="node-halo"></span><span class="node-icon">◒</span><strong>School</strong><small>32 thoughts</small><em class="node-ring"></em></button>
               <button class="thought-node node-coding" data-node-id="coding"><span class="node-halo"></span><span class="node-icon">⌁</span><strong>Coding</strong><small>18 thoughts</small><em class="node-ring"></em></button>
               <button class="thought-node node-personal" data-node-id="personal"><span class="node-halo"></span><span class="node-icon">♧</span><strong>Personal</strong><small>12 thoughts</small><em class="node-ring"></em></button>
@@ -137,7 +147,7 @@
 
           <div class="dump-composer" id="dump-composer">
             <div class="composer-top"><span class="sparkle">✦</span><span class="composer-label">BRAIN DUMP</span><span class="composer-tip">Write first. Organize later.</span><span class="composer-shortcut">⌘ ↵</span></div>
-            <div class="composer-row"><textarea id="dump-input" rows="1" placeholder="What’s on your mind? Let it all out..."></textarea><button class="send-dump" id="send-dump" aria-label="Gedanken ins Gehirn"><span>↗</span></button></div>
+            <div class="composer-row"><textarea id="dump-input" rows="1" placeholder="What’s on your mind? Let it all out..."></textarea><button class="send-dump" id="send-dump" aria-label="Send to your brain"><span>↗</span></button></div>
             <div class="composer-footer"><span><i class="ai-sparkle">✦</i> AI will gently organize this later</span><span id="dump-status">0 thoughts ready</span></div>
           </div>
         </section>
@@ -145,9 +155,9 @@
         <footer class="bottom-stats"><div><strong id="thought-total">247</strong><span>Thoughts</span></div><div><strong>83</strong><span>Tasks</span></div><div><strong>12</strong><span>Projects</span></div><div><strong>61</strong><span>Completed</span></div><div class="footer-spacer"></div><div class="sync-status"><span class="status-dot"></span> All changes saved locally <span class="sync-time">just now</span></div></footer>
       </main>
 
-      <aside class="detail-panel" id="detail-panel" aria-label="Gedanken-Details">
-        <div class="panel-top"><div><span class="panel-kicker">SELECTED THOUGHT</span><div class="panel-breadcrumb"><span id="panel-parent">Coding</span><span>›</span><strong id="panel-title">Website</strong></div></div><button class="close-panel" id="close-panel" aria-label="Details schließen">×</button></div>
-        <div class="selected-status"><span class="status-pill active-pill"><i></i><span id="panel-status">In progress</span></span><button class="panel-more" aria-label="Mehr Optionen">•••</button></div>
+      <aside class="detail-panel" id="detail-panel" aria-label="Thought details">
+        <div class="panel-top"><div><span class="panel-kicker">SELECTED THOUGHT</span><div class="panel-breadcrumb"><span id="panel-parent">Coding</span><span>›</span><strong id="panel-title">Website</strong></div></div><button class="close-panel" id="close-panel" aria-label="Close details">×</button></div>
+        <div class="selected-status"><span class="status-pill active-pill"><i></i><span id="panel-status">In progress</span></span><button class="panel-more" aria-label="More options">•••</button></div>
         <div class="detail-scroll">
           <div class="detail-progress"><div class="progress-heading"><span>Overall progress</span><strong id="panel-progress-text">80%</strong></div><div class="progress-track"><span id="panel-progress-bar" style="width:80%"></span></div><div class="progress-meta"><span><i class="task-check mini-check">✓</i> 4 completed</span><span>1 active</span></div></div>
           <section class="detail-section"><div class="section-heading"><h3>Tasks <span id="task-count">5</span></h3><button class="add-task" id="add-task">+ Add task</button></div><div class="task-list" id="task-list"><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Landing page structure</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Set up navigation</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Choose color system</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Build brain map prototype</span></label><label class="task-row"><input type="checkbox" /><span class="checkmark"></span><span>Polish the animations</span></label></div></section>
@@ -156,20 +166,20 @@
           <section class="detail-section"><div class="section-heading"><h3>Connections <span>4</span></h3><button class="edit-link">Manage</button></div><div class="connection-list"><button class="connection-chip"><span class="chip-dot violet"></span>Coding <span>↗</span></button><button class="connection-chip"><span class="chip-dot blue"></span>Design system <span>↗</span></button><button class="connection-chip"><span class="chip-dot orange"></span>Personal brand <span>↗</span></button></div></section>
           <section class="detail-section ai-suggestion"><div class="ai-heading"><span class="ai-icon">✦</span><div><strong>Organize suggestion</strong><small>Found 2 related thoughts</small></div></div><p>“Launch checklist” might belong in this project.</p><button id="review-suggestion">Review suggestion <span>→</span></button></section>
         </div>
-        <div class="panel-footer"><button class="archive-action" id="archive-action">▤ Archive thought</button><button class="delete-action" id="delete-action" aria-label="Gedanken löschen">⌫</button></div>
+        <div class="panel-footer"><button class="archive-action" id="archive-action">▤ Archive thought</button><button class="delete-action" id="delete-action" aria-label="Delete thought">⌫</button></div>
       </aside>
     </div>
 
     <div class="modal-backdrop" id="modal-backdrop" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <button class="modal-close" id="modal-close" aria-label="Schließen">×</button>
+        <button class="modal-close" id="modal-close" aria-label="Close">×</button>
         <div class="modal-icon" id="modal-icon">✦</div><p class="modal-eyebrow" id="modal-eyebrow">NEXT UP</p><h2 id="modal-title">Your next best move</h2><p class="modal-copy" id="modal-copy">Small progress compounds. Here’s one focused step to move your brain forward.</p>
         <div class="next-task-card"><div class="next-task-icon">∑</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start <span>→</span></button></div>
         <button class="secondary-modal-action" id="modal-secondary">Maybe later</button>
       </div>
     </div>
     <div class="toast" id="toast" role="status"><span class="toast-icon">✓</span><span id="toast-message">Saved to your brain</span></div>
-    <!-- GSAP motion layer (optional — the app degrades gracefully without it) -->
+    <!-- GSAP motion layer (optional; the app degrades gracefully without it) -->
     <script
       src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
       integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt"

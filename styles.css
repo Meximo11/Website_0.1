@@ -63,12 +63,74 @@ body {
 button { font: inherit; color: inherit; }
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+a:focus-visible {
   outline: 2px solid rgba(var(--blue-rgb), 0.7);
   outline-offset: 2px;
 }
+/* focus rings follow the accent of the thing they sit on */
+.thought-node:focus-visible,
+.brain-core:focus-visible { outline-color: rgba(var(--n-rgb, var(--violet-rgb)), 0.85); outline-offset: 4px; }
+.send-dump:focus-visible,
+.ai-suggestion button:focus-visible,
+.next-task-card button:focus-visible { outline-color: rgba(var(--violet-rgb), 0.85); }
+.delete-action:focus-visible { outline-color: rgba(255, 155, 155, 0.8); }
 [hidden] { display: none !important; }
 ::selection { background: rgba(var(--violet-rgb), 0.4); }
+
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* keyboard users land on the map directly */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid rgba(var(--blue-rgb), 0.5);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  opacity: 0;
+}
+.skip-link:focus-visible {
+  transform: none;
+  opacity: 1;
+  outline-offset: 0;
+}
+
+/* a physical press on every control; uses the independent `scale` property so it
+   composes with the transforms GSAP writes inline */
+.nav-item:active,
+.space-item:active,
+.view-tab:active,
+.filter-button:active,
+.history-button:active,
+.focus-button:active,
+.icon-button:active,
+.help-button:active,
+.top-avatar:active,
+.zoom-controls button:active,
+.add-task:active,
+.edit-link:active,
+.connection-chip:active,
+.archive-action:active,
+.delete-action:active,
+.ai-suggestion button:active,
+.next-task-card button:active,
+.secondary-modal-action:active,
+.modal-close:active,
+.close-panel:active,
+.tiny-plus:active,
+.more-button:active,
+.panel-more:active,
+.map-empty button:active { scale: 0.97; }
+.send-dump:active { scale: 0.96; }
 
 /* while GSAP prepares the entrance animation (class is set inline, removed by app.js) */
 html.is-loading body { visibility: hidden; }
@@ -691,6 +753,7 @@ h1 {
   color: var(--text-soft);
   pointer-events: none;
   transition: opacity 0.3s;
+  font-variant-numeric: tabular-nums;
 }
 .map-status { left: 20px; }
 .map-hint { right: 20px; gap: 6px; color: var(--muted); }
@@ -875,6 +938,7 @@ h1 {
   color: var(--muted);
   white-space: nowrap;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  font-variant-numeric: tabular-nums;
 }
 .small-node .node-icon { width: 46px; height: 46px; font-size: 17px; }
 .small-node strong { font-size: 12.5px; }
@@ -954,6 +1018,7 @@ h1 {
   transform: translateX(-50%);
   white-space: nowrap;
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.8);
+  font-variant-numeric: tabular-nums;
 }
 .brain-core strong {
   top: calc(100% + 12px);
@@ -1147,7 +1212,6 @@ body[data-brain-mode="2d"] .brain-core {
   transition: transform 0.2s var(--ease-out), box-shadow 0.2s;
 }
 .send-dump:hover { transform: translateY(-1px) scale(1.04); box-shadow: 0 12px 26px rgba(var(--violet-rgb), 0.4); }
-.send-dump:active { transform: scale(0.96); }
 .composer-footer {
   display: flex;
   justify-content: space-between;
@@ -1155,6 +1219,7 @@ body[data-brain-mode="2d"] .brain-core {
   margin-top: 8px;
   font-size: 11.5px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .ai-sparkle { margin-right: 4px; color: var(--violet); font-style: normal; }
 
