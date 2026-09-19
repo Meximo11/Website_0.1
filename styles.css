@@ -1,0 +1,13 @@
+
+/* interaction states */
+.thought-node.search-hidden { opacity: .08; pointer-events: none; }
+.thought-node.archived { opacity: .18; filter: grayscale(.7); }
+.thought-node.selected .node-icon { border-color: #d4c5ff; box-shadow: 0 0 0 4px rgba(182,144,255,.1), 0 0 28px rgba(173,133,255,.5); }
+.brain-core.selected { box-shadow: 0 0 0 7px rgba(151,130,255,.08), 0 0 50px rgba(102,96,247,.28), inset 0 0 25px rgba(114,100,227,.24); }
+.deadline-pill { color: #ffc1a1; background: rgba(245,142,103,.1); }.deadline-pill i { height: 5px; width: 5px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 7px var(--orange); }
+.stage.dragging { cursor: grabbing; }.brain-stage { cursor: grab; }.brain-stage:has(.dump-composer:hover) { cursor: default; }
+.history-muted .thought-node:not(.selected) { opacity: .58; }.history-muted .connection-lines { opacity: .57; }
+.filter-active .thought-node:not(.node-math):not(.node-website):not(.node-coding):not(.selected) { opacity: .12; }.filter-active .line { opacity: .22; }
+.cluster-mode .node-school { left: 39%; top: 34%; }.cluster-mode .node-coding { left: 61%; top: 34%; }.cluster-mode .node-personal { left: 39%; top: 63%; }.cluster-mode .node-ideas { left: 61%; top: 63%; }.cluster-mode .node-math { left: 27%; top: 26%; }.cluster-mode .node-english { left: 27%; top: 42%; }.cluster-mode .node-website { left: 73%; top: 26%; }.cluster-mode .node-godot { left: 73%; top: 42%; }.cluster-mode .node-hotel { left: 28%; top: 75%; }.cluster-mode .node-budget { left: 40%; top: 82%; }.cluster-mode .node-training { left: 60%; top: 82%; }.cluster-mode .node-travel { left: 72%; top: 75%; }
+.selected-space { background: rgba(131,171,255,.1); color: #d0dcff; }
+@media (max-width: 620px) { .cluster-mode .node-school { left: 35%; }.cluster-mode .node-coding { left: 65%; }.cluster-mode .node-personal { left: 34%; }.cluster-mode .node-ideas { left: 66%; }.cluster-mode .node-math { left: 19%; }.cluster-mode .node-english { left: 19%; }.cluster-mode .node-website { left: 81%; }.cluster-mode .node-godot { left: 81%; } }
