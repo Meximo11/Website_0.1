@@ -48,6 +48,8 @@ Three.js and GSAP are loaded on demand from jsDelivr (with an unpkg fallback). F
 | `favicon.svg` | the four-dot brand mark as a scalable favicon |
 | `fonts/` | self-hosted Latin variable-weight subsets of DM Sans and Space Grotesk (woff2) plus the OFL licence |
 | `DESIGN.md` | AI-readable design system (tokens, type, motion, do/don't) plus curated design references and open-source repos to borrow from, with a prioritised UI backlog |
+| `AGENTS.md` / `CLAUDE.md` | guidance for AI coding agents: working rules, the skills inventory and the tools that need a machine-level install (gstack, Understand Anything, graphify) |
+| `.agents/skills/`, `skills-lock.json` | vendored agent skills (taste-skill, frontend-design, stop-slop, playwright-cli, graphify, last30days, Remotion, HyperFrames core set) pinned by source and content hash |
 
 ### Testing the brain tiers
 
