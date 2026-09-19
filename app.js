@@ -51,7 +51,7 @@ function emit(name, detail = {}) {
 function showToast(message, type = 'success') {
   const toast = $('#toast');
   $('#toast-message').textContent = message;
-  $('.toast-icon', toast).textContent = type === 'info' ? '✦' : '✓';
+  $('.toast-icon use', toast).setAttribute('href', type === 'info' ? '#i-sparkle' : '#i-check');
   toast.classList.add('visible');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 2800);
@@ -86,7 +86,7 @@ function renderTasks(data) {
     const done = data.title === 'Website' ? index < (data.completed ?? 0) : false;
     const label = document.createElement('label');
     label.className = `task-row${done ? ' done' : ''}`;
-    label.innerHTML = `<input type="checkbox" ${done ? 'checked' : ''} /><span class="checkmark">✓</span><span>${escapeHtml(task)}</span>`;
+    label.innerHTML = `<input type="checkbox" ${done ? 'checked' : ''} /><span class="checkmark">${icon('check')}</span><span>${escapeHtml(task)}</span>`;
     list.appendChild(label);
   });
   $('#task-count').textContent = data.tasks.length;
@@ -97,13 +97,18 @@ function escapeHtml(value) {
   return value.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
 
+/* Phosphor icon from the inline sprite in index.html */
+function icon(name) {
+  return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
 function renderConnections(id) {
   const parent = nodeData[id]?.parent || 'Coding';
   const colorClass = nodeData[id]?.parentColor || 'violet';
   $('.connection-list').innerHTML = `
-    <button class="connection-chip"><span class="chip-dot ${colorClass}"></span>${escapeHtml(parent)} <span>↗</span></button>
-    <button class="connection-chip"><span class="chip-dot blue"></span>${id === 'school' || id === 'math' ? 'Learning' : 'Design system'} <span>↗</span></button>
-    <button class="connection-chip"><span class="chip-dot orange"></span>${id === 'personal' ? 'Wellbeing' : 'Personal brand'} <span>↗</span></button>`;
+    <button class="connection-chip"><span class="chip-dot ${colorClass}"></span>${escapeHtml(parent)} <span>${icon('arrow-up-right')}</span></button>
+    <button class="connection-chip"><span class="chip-dot blue"></span>${id === 'school' || id === 'math' ? 'Learning' : 'Design system'} <span>${icon('arrow-up-right')}</span></button>
+    <button class="connection-chip"><span class="chip-dot orange"></span>${id === 'personal' ? 'Wellbeing' : 'Personal brand'} <span>${icon('arrow-up-right')}</span></button>`;
 }
 
 function pulseNode(node) {
@@ -276,7 +281,7 @@ function addThought() {
   const newest = document.createElement('button');
   newest.className = 'thought-node tiny-node custom-node';
   newest.dataset.nodeId = `custom-${Date.now()}`;
-  newest.innerHTML = `<span class="node-halo"></span><span class="node-icon">✦</span><strong>${escapeHtml((fragments[0] || value).slice(0, 16))}${(fragments[0] || value).length > 16 ? '…' : ''}</strong><small>just now</small>`;
+  newest.innerHTML = `<span class="node-halo"></span><span class="node-icon">${icon('sparkle')}</span><strong>${escapeHtml((fragments[0] || value).slice(0, 16))}${(fragments[0] || value).length > 16 ? '…' : ''}</strong><small>just now</small>`;
   newest.style.left = `${38 + Math.random() * 24}%`;
   newest.style.top = `${18 + Math.random() * 25}%`;
   $('#node-layer').appendChild(newest);
@@ -393,7 +398,7 @@ stage.addEventListener('pointercancel', () => { dragState = null; stage.classLis
 /* ---------- toolbar ---------- */
 $('#focus-button').addEventListener('click', () => {
   const active = document.body.classList.toggle('focus-active');
-  $('#focus-button').innerHTML = active ? '<span>×</span> Exit focus' : '<span>◎</span> Focus mode';
+  $('#focus-button').innerHTML = active ? `${icon('x')} Exit focus` : `${icon('crosshair')} Focus mode`;
   if (active) selectNode(selectedId, { silent: true });
   emit('focus', { active });
   showToast(active ? `Focused on ${nodeData[selectedId]?.title || 'your thought'}` : 'Full brain map restored', 'info');
@@ -426,19 +431,19 @@ $('#filter-button').addEventListener('click', () => {
 function openModal(kind = 'next') {
   const modal = $('#modal-backdrop');
   if (kind === 'suggestion') {
-    $('#modal-icon').textContent = '✦';
+    $('#modal-icon').innerHTML = icon('sparkle');
     $('#modal-eyebrow').textContent = 'AI SUGGESTION';
     $('#modal-title').textContent = 'Two thoughts want to connect';
     $('#modal-copy').textContent = 'BrainDump found a possible link. You are always in control of what becomes part of your map.';
-    $('.next-task-card').innerHTML = '<div class="next-task-icon">⌁</div><div><span>Coding · related thought</span><strong>Launch checklist</strong><small>Added 3 days ago <b>•</b> Similar context</small></div><button id="start-next">Connect <span>→</span></button>';
+    $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('code')}</div><div><span>Coding · related thought</span><strong>Launch checklist</strong><small>Added 3 days ago <b>•</b> Similar context</small></div><button id="start-next">Connect ${icon('arrow-right')}</button>`;
     $('#modal-secondary').textContent = 'Ignore suggestion';
     $('#start-next').addEventListener('click', () => { closeModal(); emit('pulse', { color: 'violet', strength: 1.2 }); showToast('Thoughts connected'); }, { once: true });
   } else {
-    $('#modal-icon').textContent = '⚡';
+    $('#modal-icon').innerHTML = icon('lightning');
     $('#modal-eyebrow').textContent = 'NEXT UP';
     $('#modal-title').textContent = 'Your next best move';
     $('#modal-copy').textContent = 'Small progress compounds. Here’s one focused step to move your brain forward.';
-    $('.next-task-card').innerHTML = '<div class="next-task-icon">∑</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start <span>→</span></button>';
+    $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('sigma')}</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start ${icon('arrow-right')}</button>`;
     $('#modal-secondary').textContent = 'Maybe later';
     $('#start-next').addEventListener('click', () => { closeModal(); selectNode('math'); showToast('Focus session started'); }, { once: true });
   }
