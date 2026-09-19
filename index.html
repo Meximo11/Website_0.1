@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090b12" />
+    <meta name="description" content="BrainDump — dein Gehirn außerhalb deines Kopfes." />
+    <title>BrainDump — My Brain</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Hauptnavigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></div>
+          <div><strong>Brain<span>Dump</span></strong><small>think freely</small></div>
+        </div>
+
+        <div class="workspace-label">WORKSPACE</div>
+        <nav class="main-nav">
+          <button class="nav-item active" data-view="brain-map"><span class="nav-icon">⌁</span><span>Brain Map</span><b class="nav-count">247</b></button>
+          <button class="nav-item" data-view="inbox"><span class="nav-icon inbox-icon">▣</span><span>Inbox</span><b class="nav-count accent-count">7</b></button>
+          <button class="nav-item" data-view="projects"><span class="nav-icon">◇</span><span>Projects</span></button>
+          <button class="nav-item" data-view="archive"><span class="nav-icon">▤</span><span>Archive</span></button>
+        </nav>
+
+        <div class="workspace-label space-top">YOUR SPACES <button class="tiny-plus" id="add-space" aria-label="Space hinzufügen">+</button></div>
+        <div class="space-list">
+          <button class="space-item" data-space="School"><span class="space-dot blue"></span>School <small>32</small></button>
+          <button class="space-item" data-space="Coding"><span class="space-dot violet"></span>Coding <small>18</small></button>
+          <button class="space-item" data-space="Personal"><span class="space-dot orange"></span>Personal <small>12</small></button>
+          <button class="space-item" data-space="Ideas"><span class="space-dot mint"></span>Ideas <small>24</small></button>
+        </div>
+
+        <div class="sidebar-bottom">
+          <button class="nav-item subtle" id="settings-button"><span class="nav-icon">⚙</span><span>Settings</span></button>
+          <div class="profile-card">
+            <div class="avatar">M</div>
+            <div class="profile-copy"><strong>Max Mustermann</strong><small>Local workspace</small></div>
+            <button class="more-button" aria-label="Mehr Optionen">•••</button>
+          </div>
+          <div class="local-badge"><span class="status-dot"></span><span>Stored locally</span><span class="lock">⌑</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="page-heading">
+            <div class="eyebrow"><span class="live-dot"></span> YOUR PERSONAL KNOWLEDGE GRAPH</div>
+            <div class="title-line"><h1>My Brain</h1><span class="private-pill"><span class="mini-lock">⌑</span> Private</span></div>
+          </div>
+          <div class="top-actions">
+            <label class="search-box" for="search-input"><span>⌕</span><input id="search-input" type="search" placeholder="Search your brain..." /><kbd>⌘ K</kbd></label>
+            <button class="icon-button" id="notifications-button" aria-label="Benachrichtigungen"><span class="notification-dot"></span>♢</button>
+            <button class="help-button" id="help-button" aria-label="Hilfe">?</button>
+            <button class="top-avatar">M</button>
+          </div>
+        </header>
+
+        <section class="map-toolbar" aria-label="Map controls">
+          <div class="toolbar-left">
+            <div class="view-switcher" role="tablist" aria-label="Ansicht">
+              <button class="view-tab active" data-map-mode="neural"><span>✣</span> Neural</button>
+              <button class="view-tab" data-map-mode="clusters"><span>◌</span> Clusters</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <button class="filter-button" id="filter-button"><span>≡</span> Filter <i class="filter-indicator"></i></button>
+          </div>
+          <div class="toolbar-right">
+            <button class="history-button" id="history-button"><span>◷</span> <span id="history-label">Today</span> <span class="chevron">⌄</span></button>
+            <div class="zoom-controls"><button id="zoom-out" aria-label="Verkleinern">−</button><span id="zoom-level">100%</span><button id="zoom-in" aria-label="Vergrößern">+</button></div>
+            <button class="focus-button" id="focus-button"><span>◎</span> Focus mode</button>
+          </div>
+        </section>
+
+        <section class="brain-stage" id="brain-stage" aria-label="Interaktive Brain Map">
+          <div class="stage-glow glow-one"></div><div class="stage-glow glow-two"></div>
+          <div class="map-grid"></div>
+          <div class="map-status"><span class="pulse-dot"></span><span>Live graph</span><span class="map-status-divider"></span><span id="visible-count">247 thoughts</span></div>
+          <div class="map-hint"><span class="hint-key">Scroll</span> to zoom <span class="hint-sep">·</span> <span class="hint-key">Drag</span> to explore</div>
+          <svg class="connections" id="connections" viewBox="0 0 1000 650" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="lineBlue" x1="0" x2="1"><stop offset="0" stop-color="#79a9ff" stop-opacity=".16"/><stop offset=".5" stop-color="#75a4ff" stop-opacity=".72"/><stop offset="1" stop-color="#b28cff" stop-opacity=".2"/></linearGradient>
+              <linearGradient id="lineViolet" x1="0" x2="1"><stop offset="0" stop-color="#a181ff" stop-opacity=".18"/><stop offset=".5" stop-color="#bc91ff" stop-opacity=".72"/><stop offset="1" stop-color="#ffb28b" stop-opacity=".15"/></linearGradient>
+              <filter id="lineGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g class="connection-lines" id="connection-lines">
+              <path d="M500 325 C438 280 405 220 328 190" class="line blue-line" />
+              <path d="M500 325 C548 271 599 220 680 175" class="line blue-line" />
+              <path d="M500 325 C439 356 380 402 308 426" class="line violet-line" />
+              <path d="M500 325 C566 360 620 410 698 438" class="line violet-line" />
+              <path d="M328 190 C284 168 234 150 198 127" class="line blue-line soft-line" />
+              <path d="M328 190 C286 214 250 238 220 276" class="line blue-line soft-line" />
+              <path d="M680 175 C738 147 776 126 824 112" class="line blue-line soft-line" />
+              <path d="M680 175 C730 210 766 244 808 277" class="line blue-line soft-line" />
+              <path d="M308 426 C255 448 219 482 185 526" class="line violet-line soft-line" />
+              <path d="M308 426 C263 400 216 392 165 400" class="line violet-line soft-line" />
+              <path d="M698 438 C756 458 802 482 836 522" class="line violet-line soft-line" />
+              <path d="M698 438 C752 415 794 397 850 393" class="line violet-line soft-line" />
+              <path d="M220 276 C197 304 178 337 165 400" class="line blue-line faint-line" />
+              <path d="M808 277 C830 312 842 351 850 393" class="line blue-line faint-line" />
+              <path d="M185 526 C230 555 278 572 324 578" class="line violet-line faint-line" />
+              <path d="M836 522 C796 553 758 570 704 579" class="line violet-line faint-line" />
+              <path d="M324 578 C415 600 593 603 704 579" class="line violet-line faint-line" />
+              <circle class="particle p1" r="2.4"><animateMotion dur="6s" repeatCount="indefinite" path="M500 325 C438 280 405 220 328 190"/></circle>
+              <circle class="particle p2" r="2"><animateMotion dur="7s" repeatCount="indefinite" path="M500 325 C566 360 620 410 698 438"/></circle>
+              <circle class="particle p3" r="1.8"><animateMotion dur="5.5s" repeatCount="indefinite" path="M680 175 C730 210 766 244 808 277"/></circle>
+              <circle class="particle p4" r="1.7"><animateMotion dur="8s" repeatCount="indefinite" path="M185 526 C230 555 278 572 324 578"/></circle>
+            </g>
+          </svg>
+
+          <div class="node-layer" id="node-layer">
+            <button class="brain-core" data-node-id="core" aria-label="My Brain, 247 Gedanken"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-symbol">✣</span><strong>MY BRAIN</strong><small>247 thoughts</small></button>
+            <button class="thought-node node-school" data-node-id="school"><span class="node-halo"></span><span class="node-icon">◒</span><strong>School</strong><small>32 thoughts</small><em class="node-ring"></em></button>
+            <button class="thought-node node-coding" data-node-id="coding"><span class="node-halo"></span><span class="node-icon">⌁</span><strong>Coding</strong><small>18 thoughts</small><em class="node-ring"></em></button>
+            <button class="thought-node node-personal" data-node-id="personal"><span class="node-halo"></span><span class="node-icon">♧</span><strong>Personal</strong><small>12 thoughts</small><em class="node-ring"></em></button>
+            <button class="thought-node node-ideas" data-node-id="ideas"><span class="node-halo"></span><span class="node-icon">✦</span><strong>Ideas</strong><small>24 thoughts</small><em class="node-ring"></em></button>
+            <button class="thought-node small-node node-math" data-node-id="math"><span class="node-halo"></span><span class="node-icon">∑</span><strong>Math exam</strong><small>tomorrow</small><em class="deadline-ring"></em></button>
+            <button class="thought-node small-node node-english" data-node-id="english"><span class="node-halo"></span><span class="node-icon">Aa</span><strong>English</strong><small>Friday</small></button>
+            <button class="thought-node small-node node-website" data-node-id="website"><span class="node-halo"></span><span class="node-icon">⌘</span><strong>Website</strong><small>80% done</small><em class="active-ring"></em></button>
+            <button class="thought-node small-node node-godot" data-node-id="godot"><span class="node-halo"></span><span class="node-icon">▱</span><strong>Godot</strong><small>7 thoughts</small></button>
+            <button class="thought-node tiny-node node-hotel" data-node-id="hotel"><span class="node-icon">⌂</span><strong>Hotel</strong></button>
+            <button class="thought-node tiny-node node-budget" data-node-id="budget"><span class="node-icon">€</span><strong>Budget</strong></button>
+            <button class="thought-node tiny-node node-training" data-node-id="training"><span class="node-icon">↗</span><strong>Training</strong></button>
+            <button class="thought-node tiny-node node-travel" data-node-id="travel"><span class="node-icon">✈</span><strong>Travel</strong></button>
+          </div>
+
+          <div class="map-legend"><span class="legend-title">NODE STATUS</span><span><i class="legend-dot active"></i> Active</span><span><i class="legend-dot deadline"></i> Deadline soon</span><span><i class="legend-dot connected"></i> Connected</span></div>
+
+          <div class="dump-composer" id="dump-composer">
+            <div class="composer-top"><span class="sparkle">✦</span><span class="composer-label">BRAIN DUMP</span><span class="composer-tip">Write first. Organize later.</span><span class="composer-shortcut">⌘ ↵</span></div>
+            <div class="composer-row"><textarea id="dump-input" rows="1" placeholder="What’s on your mind? Let it all out..."></textarea><button class="send-dump" id="send-dump" aria-label="Gedanken ins Gehirn"><span>↗</span></button></div>
+            <div class="composer-footer"><span><i class="ai-sparkle">✦</i> AI will gently organize this later</span><span id="dump-status">0 thoughts ready</span></div>
+          </div>
+        </section>
+
+        <footer class="bottom-stats"><div><strong id="thought-total">247</strong><span>Thoughts</span></div><div><strong>83</strong><span>Tasks</span></div><div><strong>12</strong><span>Projects</span></div><div><strong>61</strong><span>Completed</span></div><div class="footer-spacer"></div><div class="sync-status"><span class="status-dot"></span> All changes saved locally <span class="sync-time">just now</span></div></footer>
+      </main>
+
+      <aside class="detail-panel" id="detail-panel" aria-label="Gedanken-Details">
+        <div class="panel-top"><div><span class="panel-kicker">SELECTED THOUGHT</span><div class="panel-breadcrumb"><span id="panel-parent">Coding</span><span>›</span><strong id="panel-title">Website</strong></div></div><button class="close-panel" id="close-panel" aria-label="Details schließen">×</button></div>
+        <div class="selected-status"><span class="status-pill active-pill"><i></i><span id="panel-status">In progress</span></span><button class="panel-more" aria-label="Mehr Optionen">•••</button></div>
+        <div class="detail-scroll">
+          <div class="detail-progress"><div class="progress-heading"><span>Overall progress</span><strong id="panel-progress-text">80%</strong></div><div class="progress-track"><span id="panel-progress-bar" style="width:80%"></span></div><div class="progress-meta"><span><i class="task-check mini-check">✓</i> 4 completed</span><span>1 active</span></div></div>
+          <section class="detail-section"><div class="section-heading"><h3>Tasks <span id="task-count">5</span></h3><button class="add-task" id="add-task">+ Add task</button></div><div class="task-list" id="task-list"><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Landing page structure</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Set up navigation</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Choose color system</span></label><label class="task-row done"><input type="checkbox" checked /><span class="checkmark">✓</span><span>Build brain map prototype</span></label><label class="task-row"><input type="checkbox" /><span class="checkmark"></span><span>Polish the animations</span></label></div></section>
+          <section class="detail-section split-section"><div><span class="field-label">DEADLINE</span><p class="field-value"><span class="calendar-icon">▣</span> 25 Sep 2026</p></div><div><span class="field-label">ESTIMATE</span><p class="field-value"><span class="clock-icon">◷</span> 2h 30m</p></div></section>
+          <section class="detail-section"><div class="section-heading"><h3>Notes</h3><button class="edit-link" id="edit-notes">Edit</button></div><p class="notes-copy" id="notes-copy">The first version should feel calm and alive. Add subtle animations without distracting from the thought itself.</p></section>
+          <section class="detail-section"><div class="section-heading"><h3>Connections <span>4</span></h3><button class="edit-link">Manage</button></div><div class="connection-list"><button class="connection-chip"><span class="chip-dot violet"></span>Coding <span>↗</span></button><button class="connection-chip"><span class="chip-dot blue"></span>Design system <span>↗</span></button><button class="connection-chip"><span class="chip-dot orange"></span>Personal brand <span>↗</span></button></div></section>
+          <section class="detail-section ai-suggestion"><div class="ai-heading"><span class="ai-icon">✦</span><div><strong>Organize suggestion</strong><small>Found 2 related thoughts</small></div></div><p>“Launch checklist” might belong in this project.</p><button id="review-suggestion">Review suggestion <span>→</span></button></section>
+        </div>
+        <div class="panel-footer"><button class="archive-action" id="archive-action">▤ Archive thought</button><button class="delete-action" id="delete-action" aria-label="Gedanken löschen">⌫</button></div>
+      </aside>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close" aria-label="Schließen">×</button>
+        <div class="modal-icon" id="modal-icon">✦</div><p class="modal-eyebrow" id="modal-eyebrow">NEXT UP</p><h2 id="modal-title">Your next best move</h2><p class="modal-copy" id="modal-copy">Small progress compounds. Here’s one focused step to move your brain forward.</p>
+        <div class="next-task-card"><div class="next-task-icon">∑</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start <span>→</span></button></div>
+        <button class="secondary-modal-action" id="modal-secondary">Maybe later</button>
+      </div>
+    </div>
+    <div class="toast" id="toast" role="status"><span class="toast-icon">✓</span><span id="toast-message">Saved to your brain</span></div>
+    <script src="app.js"></script>
+  </body>
+</html>
