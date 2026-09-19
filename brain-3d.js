@@ -36,13 +36,13 @@
 
   /* palette — kept in sync with styles.css */
   const PALETTE = {
-    blue: [0.474, 0.663, 1.0],
-    violet: [0.698, 0.549, 1.0],
-    orange: [1.0, 0.624, 0.478],
-    mint: [0.498, 0.89, 0.765],
-    white: [0.92, 0.95, 1.0]
+    slate: [0.55, 0.62, 0.7],
+    ember: [0.87, 0.46, 0.25],
+    amber: [0.9, 0.7, 0.38],
+    sage: [0.6, 0.72, 0.6],
+    white: [0.94, 0.91, 0.85]
   };
-  const CLASS_COLORS = [PALETTE.blue, PALETTE.violet, PALETTE.orange];
+  const CLASS_COLORS = [PALETTE.slate, PALETTE.ember, PALETTE.amber];
 
   /* ------------------------------------------------------------------
      shared animation state (both renderers read from here)
@@ -61,13 +61,14 @@
     boost: 0,
     pulse: 0,
     pulseTweened: false,
-    pulseColor: PALETTE.violet,
+    pulseColor: PALETTE.ember,
     intro: reducedMotion ? 1 : 0,
     introTweened: false,
     focus: 1,
     targetFocus: 1,
     activity: 1,
-    paused: document.hidden
+    paused: document.hidden,
+    anchorIds: []
   };
 
   const BURST_COUNT = 56;
@@ -75,7 +76,7 @@
     active: false,
     life: 0,
     dirty: false,
-    color: PALETTE.violet,
+    color: PALETTE.ember,
     pos: new Float32Array(BURST_COUNT * 3),
     vel: new Float32Array(BURST_COUNT * 3)
   };
@@ -87,6 +88,18 @@
   const rgba = (c, a) => `rgba(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)}, ${a})`;
 
   /* deterministic random so the brain looks the same on every visit */
+  function hashString(value) {
+    let h = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      h ^= value.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function anchorIndex(id, mod) {
+    return mod > 0 ? hashString(String(id)) % mod : 0;
+  }
+
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
@@ -156,8 +169,9 @@
       pz += (pz / len) * g;
       px += side * 0.3;                                   // hemisphere gap
 
-      const t = (pz + 1) / 2;                             // back → front : violet → blue
-      const rgb = brighten(mix(PALETTE.violet, PALETTE.blue, t), 0.7 + rand() * 0.5);
+      const t = (pz + 1) / 2;                             // back → front : stone → bone
+      let rgb = brighten(mix(PALETTE.slate, PALETTE.white, t), 0.72 + rand() * 0.5);
+      if (rand() < 0.04) rgb = brighten(PALETTE.ember, 0.9 + rand() * 0.5); // a few live synapses
       push(px, py, pz, rgb, 0.55 + rand() * 0.75, t > 0.5 ? 0 : 1);
     }
 
@@ -171,7 +185,7 @@
         side * 0.3 + s * Math.cos(phi) * 0.45 * r,
         u * 0.58 * r,
         s * Math.sin(phi) * 0.85 * r,
-        brighten(PALETTE.violet, 0.35 + rand() * 0.35),
+        brighten(PALETTE.amber, 0.3 + rand() * 0.3),
         0.45 + rand() * 0.5,
         1
       );
@@ -186,7 +200,7 @@
         s * Math.cos(phi) * 0.4 * ridges,
         -0.44 + u * 0.2,
         -0.66 + s * Math.sin(phi) * 0.26 * ridges,
-        brighten(PALETTE.orange, 0.6 + rand() * 0.5),
+        brighten(mix(PALETTE.sage, PALETTE.white, rand()), 0.5 + rand() * 0.4),
         0.6 + rand() * 0.6,
         2
       );
@@ -196,11 +210,11 @@
       const a = rand() * Math.PI * 2;
       const r = 0.09 + rand() * 0.06;
       const yy = -0.36 - rand() * 0.42;
-      push(Math.cos(a) * r, yy, -0.32 + Math.sin(a) * r * 0.8 - (yy + 0.36) * 0.35, brighten(PALETTE.violet, 0.6 + rand() * 0.3), 0.55 + rand() * 0.4, 1);
+      push(Math.cos(a) * r, yy, -0.32 + Math.sin(a) * r * 0.8 - (yy + 0.36) * 0.35, brighten(PALETTE.slate, 0.6 + rand() * 0.3), 0.55 + rand() * 0.4, 1);
     }
 
     const { pairs, adjacency } = buildLinks(positions, count, linkDistance, maxLinks, rand);
-    return { count, positions, colors, sizes, phases, classes, pairs, adjacency, rand };
+    return { count, surfaceCount: surface, positions, colors, sizes, phases, classes, pairs, adjacency, rand };
   }
 
   /* nearest-neighbour links via a uniform grid */
@@ -483,7 +497,7 @@
       uCamDist: { value: 8 },
       uPulse: { value: 0 },
       uOpacity: { value: 0 },
-      uPulseColor: { value: new THREE.Vector3(...PALETTE.violet) }
+      uPulseColor: { value: new THREE.Vector3(...PALETTE.ember) }
     };
     const pointMaterial = new THREE.ShaderMaterial({
       uniforms,
@@ -556,11 +570,11 @@
 
     /* soft glow behind and a bright core inside */
     const glowTexture = makeGlowTexture(THREE);
-    const glowMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xb28cff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    const glowMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xc98a52, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
     const glow = new THREE.Sprite(glowMaterial);
     glow.renderOrder = 0;
     scene.add(glow);
-    const coreMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0x9dc0ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    const coreMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xb9ac92, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
     const core = new THREE.Sprite(coreMaterial);
     core.renderOrder = 1;
     scene.add(core);
@@ -606,7 +620,7 @@
       uniforms.uPulseColor.value.set(state.pulseColor[0], state.pulseColor[1], state.pulseColor[2]);
       lineMaterial.opacity = (0.13 + state.pulse * 0.22) * alpha;
       glowMaterial.opacity = (0.17 + state.pulse * 0.4) * alpha;
-      glowMaterial.color.setRGB(state.pulseColor[0], state.pulseColor[1], state.pulseColor[2]).lerp(new THREE.Color(0xb28cff), 1 - Math.min(1, state.pulse));
+      glowMaterial.color.setRGB(state.pulseColor[0], state.pulseColor[1], state.pulseColor[2]).lerp(new THREE.Color(0xb9a68c), 1 - Math.min(1, state.pulse));
       const glowScale = 2.5 + state.pulse * 0.7 + Math.sin(state.time * 0.9) * 0.08;
       glow.scale.set(glowScale, glowScale, 1);
       coreMaterial.opacity = (0.2 + state.pulse * 0.5) * alpha;
@@ -635,6 +649,23 @@
       }
 
       renderer.render(scene, camera);
+
+      if (state.anchorIds.length) {
+        group.updateMatrixWorld(true);
+        camera.updateMatrixWorld();
+        const w = layer.clientWidth;
+        const h = layer.clientHeight;
+        const v = new THREE.Vector3();
+        const nodes = [];
+        for (const id of state.anchorIds) {
+          const i = anchorIndex(id, brain.surfaceCount) * 3;
+          v.set(brain.positions[i], brain.positions[i + 1], brain.positions[i + 2]).applyMatrix4(group.matrixWorld);
+          const front = v.z;
+          v.applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
+          nodes.push({ id, x: (v.x / v.w * 0.5 + 0.5) * w, y: (0.5 - v.y / v.w * 0.5) * h, front });
+        }
+        document.dispatchEvent(new CustomEvent('braindump:project', { detail: { nodes } }));
+      }
     }
 
     function dispose() {
@@ -656,7 +687,7 @@
     }, { once: true });
 
     raf = requestAnimationFrame(frame);
-    return { dispose };
+    return { dispose, brain };
   }
 
   /* ------------------------------------------------------------------
@@ -686,8 +717,8 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const sprites = CLASS_COLORS.map(c => makeSprite(c, 48));
     const whiteSprite = makeSprite(PALETTE.white, 48);
-    let burstSprite = makeSprite(PALETTE.violet, 48);
-    let burstSpriteColor = PALETTE.violet;
+    let burstSprite = makeSprite(PALETTE.ember, 48);
+    let burstSpriteColor = PALETTE.ember;
 
     const SIGNALS = 22;
     const signals = createSignals(brain, SIGNALS);
@@ -748,12 +779,24 @@
         projectPoint(brain.positions[i * 3], brain.positions[i * 3 + 1], brain.positions[i * 3 + 2], sc, m, projected, i * 3);
       }
 
+      if (state.anchorIds.length) {
+        const nodes = state.anchorIds.map(id => {
+          const i = anchorIndex(id, brain.surfaceCount);
+          const x = brain.positions[i * 3], y = brain.positions[i * 3 + 1], z = brain.positions[i * 3 + 2];
+          const x1 = x * m.cz - y * m.sz, y1 = x * m.sz + y * m.cz;
+          const x2 = x1 * m.cy + z * m.sy, z2 = -x1 * m.sy + z * m.cy;
+          const y3 = y1 * m.cx - z2 * m.sx, z3 = y1 * m.sx + z2 * m.cx;
+          return { id, x: projected[i * 3], y: projected[i * 3 + 1], front: z3 * sc };
+        });
+        document.dispatchEvent(new CustomEvent('braindump:project', { detail: { nodes } }));
+      }
+
       ctx.clearRect(0, 0, w, h);
       ctx.globalCompositeOperation = 'lighter';
 
       /* glow + core */
       const glowR = pxPerUnit * (1.25 + state.pulse * 0.35);
-      const glowColor = mix([0.698, 0.549, 1.0], state.pulseColor, Math.min(1, state.pulse));
+      const glowColor = mix([0.72, 0.66, 0.56], state.pulseColor, Math.min(1, state.pulse));
       const glowGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
       glowGradient.addColorStop(0, rgba(glowColor, (0.16 + state.pulse * 0.4) * alpha));
       glowGradient.addColorStop(0.45, rgba(glowColor, 0.08 * alpha));
@@ -762,8 +805,8 @@
       ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
       const coreR = pxPerUnit * (0.42 + state.pulse * 0.12);
       const coreGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGradient.addColorStop(0, rgba(PALETTE.blue, (0.18 + state.pulse * 0.4) * alpha));
-      coreGradient.addColorStop(1, rgba(PALETTE.blue, 0));
+      coreGradient.addColorStop(0, rgba(PALETTE.slate, (0.18 + state.pulse * 0.4) * alpha));
+      coreGradient.addColorStop(1, rgba(PALETTE.slate, 0));
       ctx.fillStyle = coreGradient;
       ctx.fillRect(cx - coreR, cy - coreR, coreR * 2, coreR * 2);
 
@@ -771,7 +814,7 @@
       const linkCount = brain.pairs.length / 2;
       ctx.lineWidth = 1;
       for (let bucket = 0; bucket < 4; bucket++) {
-        ctx.strokeStyle = rgba([0.6, 0.64, 1.0], (0.06 + bucket * 0.06) * (1 + state.pulse * 0.9) * alpha);
+        ctx.strokeStyle = rgba([0.72, 0.67, 0.58], (0.05 + bucket * 0.05) * (1 + state.pulse * 0.9) * alpha);
         ctx.beginPath();
         for (let l = 0; l < linkCount; l++) {
           const a = brain.pairs[l * 2] * 3, b = brain.pairs[l * 2 + 1] * 3;
@@ -826,7 +869,7 @@
     }
 
     raf = requestAnimationFrame(frame);
-    return { dispose };
+    return { dispose, brain };
   }
 
   /* ------------------------------------------------------------------
@@ -835,27 +878,43 @@
   const api = {
     get mode() { return state.mode; },
     pulse(color, strength = 1) {
-      state.pulseColor = PALETTE[color] || PALETTE.violet;
+      state.pulseColor = PALETTE[color] || PALETTE.ember;
       animatePulse(clamp(strength, 0.1, 2));
       state.boost += 0.35 * strength;
     },
     burst(color) {
-      spawnBurst(PALETTE[color] || PALETTE.violet);
+      spawnBurst(PALETTE[color] || PALETTE.ember);
       api.pulse(color, 1.3);
       state.boost += 1.2;
     },
     nudge(amount = 1) { state.boost += 1.4 * amount; },
+    face(id) {
+      if (!activeRenderer || !activeRenderer.brain || id == null) return;
+      const brain = activeRenderer.brain;
+      const i = anchorIndex(id, brain.surfaceCount) * 3;
+      const x = brain.positions[i], z = brain.positions[i + 2];
+      if (Math.hypot(x, z) < 0.02) return; // already centered on the axis
+      const target = Math.atan2(-x, z);
+      let delta = target - state.rotY;
+      delta = ((delta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      state.targetYaw = clamp(state.targetYaw - delta, -0.9, 0.9) + delta; // follow within parallax range
+      state.targetYaw = target - state.rotY; // absolute yaw, springs via yawOffset
+      state.targetYaw = clamp(state.targetYaw, -Math.PI, Math.PI);
+    },
     setFocus(active) {
       state.targetFocus = active ? 0.42 : 1;
       state.activity = active ? 0.6 : 1;
     },
     setActivity(level) { state.activity = clamp(Number(level) || 1, 0.2, 2); },
     setTransform(x, y, zoom) {
-      layer.style.transform = `translate(${x || 0}px, ${y || 0}px) scale(${(zoom || 100) / 100})`;
+      const target = document.getElementById('brain-field') || layer;
+      target.style.transform = `translate(${x || 0}px, ${y || 0}px) scale(${(zoom || 100) / 100})`;
     }
   };
   window.BrainDump3D = api;
 
+  document.addEventListener('braindump:anchors', event => { state.anchorIds = ((event.detail || {}).ids || []).slice(); });
+  document.addEventListener('braindump:face', event => { api.face((event.detail || {}).id); });
   document.addEventListener('braindump:transform', event => { const d = event.detail || {}; api.setTransform(d.x, d.y, d.zoom); });
   document.addEventListener('braindump:pulse', event => { const d = event.detail || {}; api.pulse(d.color, d.strength ?? 1); });
   document.addEventListener('braindump:burst', event => { api.burst((event.detail || {}).color); });
