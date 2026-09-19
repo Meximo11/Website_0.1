@@ -43,6 +43,7 @@ Three.js and GSAP are loaded on demand from jsDelivr (with an unpkg fallback). W
 | `styles.css` | the complete colour system, layout, nodes, panels, modal, toast, responsive rules |
 | `app.js` | interaction layer + GSAP motion; talks to the brain via `braindump:*` DOM events |
 | `brain-3d.js` | the 3D brain (Three.js), the Canvas 2D fallback and the CSS fallback switch |
+| `DESIGN.md` | AI-readable design system (tokens, type, motion, do/don't) plus curated design references and open-source repos to borrow from, with a prioritised UI backlog |
 
 ### Testing the brain tiers
 
