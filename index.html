@@ -169,6 +169,21 @@
       </div>
     </div>
     <div class="toast" id="toast" role="status"><span class="toast-icon">✓</span><span id="toast-message">Saved to your brain</span></div>
+    <!-- GSAP motion layer (optional — the app degrades gracefully without it) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
+      integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt"
+      crossorigin="anonymous"
+      onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/gsap@3.12.5/dist/gsap.min.js';document.head.appendChild(s);"
+    ></script>
+    <script>
+      // Hold the first paint until GSAP has staged the entrance; app.js lifts the flag,
+      // a failsafe lifts it after 3 s no matter what.
+      if (window.gsap) {
+        document.documentElement.classList.add('is-loading');
+        setTimeout(function () { document.documentElement.classList.remove('is-loading'); }, 3000);
+      }
+    </script>
     <script src="app.js"></script>
     <script src="brain-3d.js"></script>
   </body>
