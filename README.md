@@ -22,6 +22,8 @@ The current V1 prototype is a zero-build static app that runs directly in the br
 - AI suggestion preview with explicit review / ignore behavior
 - responsive layout for a compact tablet / mobile view (the detail panel becomes an overlay, the composer gets its own strip below the map)
 - local-storage status shown as a first-class privacy affordance
+- inline editing everywhere: quick-add row for tasks, in-place notes editor, and a composed empty state when a search matches nothing (no native `prompt()` dialogs)
+- **Phosphor icons** (inline SVG sprite, MIT) instead of unicode glyphs, self-hosted **DM Sans / Space Grotesk**, favicon and Open Graph meta, a skip link and accent-coloured focus rings
 
 ## Run locally
 
@@ -33,16 +35,18 @@ python3 -m http.server 4173
 
 Then open `http://localhost:4173`.
 
-Three.js and GSAP are loaded on demand from jsDelivr (with an unpkg fallback). Without network access the app still works: the brain switches to the 2D canvas renderer and the interface simply skips the GSAP choreography.
+Three.js and GSAP are loaded on demand from jsDelivr (with an unpkg fallback). Fonts and icons ship with the repository, so without network access the app still looks the same: the brain switches to the 2D canvas renderer and the interface simply skips the GSAP choreography.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `index.html` | markup, SVG connection lines, script loading |
+| `index.html` | markup, the Phosphor icon sprite (`<symbol id="i-…">`), SVG connection lines, script loading |
 | `styles.css` | the complete colour system, layout, nodes, panels, modal, toast, responsive rules |
 | `app.js` | interaction layer + GSAP motion; talks to the brain via `braindump:*` DOM events |
 | `brain-3d.js` | the 3D brain (Three.js), the Canvas 2D fallback and the CSS fallback switch |
+| `favicon.svg` | the four-dot brand mark as a scalable favicon |
+| `fonts/` | self-hosted Latin variable-weight subsets of DM Sans and Space Grotesk (woff2) plus the OFL licence |
 | `DESIGN.md` | AI-readable design system (tokens, type, motion, do/don't) plus curated design references and open-source repos to borrow from, with a prioritised UI backlog |
 
 ### Testing the brain tiers

@@ -47,7 +47,7 @@ tracking, floating pill navigation).
 | --- | --- | --- |
 | `--text` | `#eef1fa` | headings, primary copy |
 | `--text-soft` | `#b6bccf` | secondary copy |
-| `--muted` | `#7f879f` | labels, metadata, kickers (uppercase, tracked) |
+| `--muted` | `#7f879f` | labels, metadata, kickers (sentence case) |
 
 ### Accents — one job each
 
@@ -71,15 +71,34 @@ larger than a pill button. The 3D brain reads the same palette
 | --- | --- | --- |
 | Display / headings | **Space Grotesk** 500–700 | `h1` 30px / 600 / `-0.03em`, panel & modal titles 18–26px |
 | Body / UI | **DM Sans** 400–600 | base 14px / 1.4, buttons 13px, metadata 11–12px |
-| Kickers / labels | DM Sans 600, 10.5–11px, `letter-spacing: .14–.24em`, uppercase | `SELECTED THOUGHT`, `WORKSPACE`, `NODE STATUS` |
+| Kickers / labels | DM Sans 500–600, 11–12px, `letter-spacing: .01em`, **sentence case** | `Selected thought`, `Workspace`, `Node status` |
+| Brand mark | Space Grotesk 700, 12px, `letter-spacing: .24em`, uppercase | only `MY BRAIN` under the core |
 | Numbers | Space Grotesk 600–700 | stats footer 20px, brain core counter |
 
-Scale in use: 10.5 · 11 · 12 · 13 · 14 · 15 · 16 · 18 · 20 · 22 · 24 · 26 · 30 · 46 px
-(46px is reserved for the brain core symbol).
+Scale in use: 11 · 11.5 · 12 · 13 · 14 · 15 · 16 · 18 · 20 · 22 · 24 · 26 · 30 · 44 px
+(44px is reserved for the brain core icon).
+
+Fonts are **self-hosted** (`fonts/*.woff2`, Latin variable subsets, `@font-face` at the
+top of `styles.css`, `font-display: swap`, preloaded in `index.html`). No Google Fonts
+`<link>`. Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`, and every
+live number (`zoom-level`, counters, map status, composer counter) is `tabular-nums`.
 
 Weights in use: 500 · 600 (default emphasis) · 700 (rare). Rule of thumb borrowed
-from Dala / Superpower: create hierarchy with **scale and tracking**, not with
-weight 800. Nothing heavier than 700.
+from Dala / Superpower: create hierarchy with **scale and colour**, not with
+weight 800 or capitals. Nothing heavier than 700.
+
+### Iconography
+
+Icons are **[Phosphor](https://phosphoricons.com)** (MIT), shipped as an inline SVG
+sprite at the top of `<body>` and generated from `@phosphor-icons/core`. Use
+`<svg class="icon" aria-hidden="true"><use href="#i-name"></use></svg>` in markup
+or `icon('name')` in `app.js`. The `.icon` class is `1em` square and fills
+`currentColor`, so size and colour come from the container (`.nav-icon` 15px,
+`.node-icon` 22px, `.core-symbol` 44px, buttons 15–18px, `.checkmark` 10px).
+Weights: *regular* for objects, *bold* for glyph-like marks (x, plus, check,
+arrows, caret), *fill* for the sparkle / send / lightning accents. Glows use
+`filter: drop-shadow(...)`, never `text-shadow`. Typographic marks (`›`, `·`, `•`,
+`⌘ ↵` in `kbd`) stay text; nothing else may be a unicode glyph.
 
 ---
 
@@ -183,7 +202,10 @@ laptops).
 - keep the canvas near-black; let colour come from glows, lines and status only
 - give each accent exactly one meaning (space / status); reuse, don't invent
 - separate layers with hairlines + blur, not shadows
-- build hierarchy with scale + tracking; uppercase tracked kickers for labels
+- build hierarchy with scale + colour; labels are sentence case, muted, 11–12px
+- give every control a press (`scale: .97` on `:active`) and a focus ring in its own accent
+- design the empty, loading and error states before the happy path (see `.map-empty`)
+- edit in place (quick-add row, notes editor); never `prompt()` / `alert()` / `confirm()`
 - stage every appearance (entrance timeline) and every state change (tween), and
   keep the brain in the loop through `braindump:*` events
 - degrade gracefully: no GSAP → CSS transitions; no WebGL → 2D; no canvas → CSS
@@ -195,6 +217,10 @@ laptops).
 - no weight 800/900, no more than two font families
 - no motion longer than ~0.9 s outside the entrance timeline
 - no new colour without adding an `--x-rgb` twin and a `PALETTE` entry in `brain-3d.js`
+- no unicode glyphs as icons, no icon fonts; add a symbol to the sprite instead
+- no decorative dots or pulses; a dot must mean a state (live, unread, node status)
+- no tracked uppercase labels (the `MY BRAIN` mark is the single exception)
+- no em-dashes in interface copy; no third-party font or icon requests
 
 ---
 
@@ -275,6 +301,7 @@ Ordered by impact ÷ effort. Each item is self-contained and can be one commit.
    (Superpower pattern) — frees ~56 px of vertical space for the map.
 4. **Mono font for numbers & shortcuts** (`JetBrains Mono` or `Commit Mono`
    fallback) on stats, counters, `kbd` — the Resend "instrumented" feel.
+   (Self-host it in `fonts/` like the other two.)
 5. **Bloom / DOF pass for the WebGL brain** (UnrealBloomPass + optional bokeh)
    behind a quality switch; keep additive sprites for the 2D tier.
    *(Digital-Brain, 3D-Neural-Network-Visualizer)*
@@ -287,3 +314,15 @@ Ordered by impact ÷ effort. Each item is self-contained and can be one commit.
    stage atmosphere — slow hue-shifting radial gradients under the grid.
 10. **Design tokens → JSON** (`design-tokens.json`) exported from `:root` so the
     brain palette, CSS and future components share one source.
+
+---
+
+## 13. Changelog (design)
+
+- **2026-09-19, redesign pass (taste-skill audit)**: favicon + Open Graph meta,
+  skip link, `lang="en"` with English aria-labels, press feedback on every control,
+  accent focus rings, `text-wrap`, tabular numerals; search empty state, inline task
+  quick-add and notes editor instead of `prompt()`; 29 unicode glyph icons replaced
+  by a Phosphor sprite (40 symbols); labels moved from tracked caps to sentence case,
+  decorative live dot removed; DM Sans + Space Grotesk self-hosted.
+- **2026-09-19, DESIGN.md created** from the reference research (§10–12).
