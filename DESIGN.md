@@ -97,8 +97,10 @@ or `icon('name')` in `app.js`. The `.icon` class is `1em` square and fills
 `.node-icon` 22px, `.core-symbol` 44px, buttons 15–18px, `.checkmark` 10px).
 Weights: *regular* for objects, *bold* for glyph-like marks (x, plus, check,
 arrows, caret), *fill* for the sparkle / send / lightning accents. Glows use
-`filter: drop-shadow(...)`, never `text-shadow`. Typographic marks (`›`, `·`, `•`,
-`⌘ ↵` in `kbd`) stay text; nothing else may be a unicode glyph.
+`filter: drop-shadow(...)`, never `text-shadow`. Typographic marks (`›`, `·`, `•`)
+stay text; nothing else may be a unicode glyph. Keyboard hints use the `command` and
+`key-return` symbols, and `app.js` swaps the command symbol for the word "Ctrl" outside
+Apple platforms (`.mod-key`).
 
 ---
 
@@ -323,6 +325,6 @@ Ordered by impact ÷ effort. Each item is self-contained and can be one commit.
   skip link, `lang="en"` with English aria-labels, press feedback on every control,
   accent focus rings, `text-wrap`, tabular numerals; search empty state, inline task
   quick-add and notes editor instead of `prompt()`; 29 unicode glyph icons replaced
-  by a Phosphor sprite (40 symbols); labels moved from tracked caps to sentence case,
+  by a Phosphor sprite (42 symbols); labels moved from tracked caps to sentence case,
   decorative live dot removed; DM Sans + Space Grotesk self-hosted.
 - **2026-09-19, DESIGN.md created** from the reference research (§10–12).

@@ -65,6 +65,8 @@
     <symbol id="i-clock" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></symbol>
     <symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol>
     <symbol id="i-lightning" viewBox="0 0 256 256"><path d="M213.85,125.46l-112,120a8,8,0,0,1-13.69-7l14.66-73.33L45.19,143.49a8,8,0,0,1-3-13l112-120a8,8,0,0,1,13.69,7L153.18,90.9l57.63,21.61a8,8,0,0,1,3,12.95Z"/></symbol>
+    <symbol id="i-command" viewBox="0 0 256 256"><path d="M180,140H164V116h16a40,40,0,1,0-40-40V92H116V76a40,40,0,1,0-40,40H92v24H76a40,40,0,1,0,40,40V164h24v16a40,40,0,1,0,40-40ZM164,76a16,16,0,1,1,16,16H164ZM60,76a16,16,0,0,1,32,0V92H76A16,16,0,0,1,60,76ZM92,180a16,16,0,1,1-16-16H92Zm24-64h24v24H116Zm64,80a16,16,0,0,1-16-16V164h16a16,16,0,0,1,0,32Z"/></symbol>
+    <symbol id="i-key-return" viewBox="0 0 256 256"><path d="M71.51,144.49a12,12,0,0,1,0-17l24-24a12,12,0,0,1,17,17L109,124h55V104a12,12,0,0,1,24,0v32a12,12,0,0,1-12,12H109l3.52,3.51a12,12,0,0,1-17,17ZM236,56V200a20,20,0,0,1-20,20H40a20,20,0,0,1-20-20V56A20,20,0,0,1,40,36H216A20,20,0,0,1,236,56Zm-24,4H44V196H212Z"/></symbol>
   </svg>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Main navigation">
@@ -107,7 +109,7 @@
             <div class="title-line"><h1>My Brain</h1><span class="private-pill"><span class="mini-lock"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg></span> Private</span></div>
           </div>
           <div class="top-actions">
-            <label class="search-box" for="search-input"><svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg><input id="search-input" type="search" placeholder="Search your brain..." /><kbd>⌘ K</kbd></label>
+            <label class="search-box" for="search-input"><svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg><input id="search-input" type="search" placeholder="Search your brain..." /><kbd><span class="mod-key"><svg class="icon" aria-hidden="true"><use href="#i-command"></use></svg></span> K</kbd></label>
             <button class="icon-button" id="notifications-button" aria-label="Notifications"><span class="notification-dot"></span><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></button>
             <button class="help-button" id="help-button" aria-label="Help"><svg class="icon" aria-hidden="true"><use href="#i-question"></use></svg></button>
             <button class="top-avatar">M</button>
@@ -194,7 +196,7 @@
           <div class="map-legend"><span class="legend-title">Node status</span><span><i class="legend-dot active"></i> Active</span><span><i class="legend-dot deadline"></i> Deadline soon</span><span><i class="legend-dot connected"></i> Connected</span></div>
 
           <div class="dump-composer" id="dump-composer">
-            <div class="composer-top"><span class="sparkle"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"></use></svg></span><span class="composer-label">Brain dump</span><span class="composer-tip">Write first. Organize later.</span><span class="composer-shortcut">⌘ ↵</span></div>
+            <div class="composer-top"><span class="sparkle"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"></use></svg></span><span class="composer-label">Brain dump</span><span class="composer-tip">Write first. Organize later.</span><span class="composer-shortcut" aria-label="Command Enter sends"><span class="mod-key"><svg class="icon" aria-hidden="true"><use href="#i-command"></use></svg></span> <svg class="icon" aria-hidden="true"><use href="#i-key-return"></use></svg></span></div>
             <div class="composer-row"><textarea id="dump-input" rows="1" placeholder="What’s on your mind? Let it all out..."></textarea><button class="send-dump" id="send-dump" aria-label="Send to your brain"><svg class="icon" aria-hidden="true"><use href="#i-paper-plane"></use></svg></button></div>
             <div class="composer-footer"><span><i class="ai-sparkle"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"></use></svg></i> AI will gently organize this later</span><span id="dump-status">0 thoughts ready</span></div>
           </div>

@@ -170,6 +170,9 @@ p { text-wrap: pretty; }
 .node-icon .icon { filter: drop-shadow(0 0 6px rgba(var(--n-rgb), 0.55)); }
 .local-badge .lock .icon { font-size: 13px; }
 .chevron .icon { font-size: 11px; }
+.mod-key { display: inline-flex; align-items: center; }
+.search-box kbd, .composer-shortcut { display: inline-flex; align-items: center; gap: 3px; }
+.search-box kbd .icon, .composer-shortcut .icon { font-size: 11px; }
 
 /* while GSAP prepares the entrance animation (class is set inline, removed by app.js) */
 html.is-loading body { visibility: hidden; }
@@ -1557,7 +1560,7 @@ body[data-brain-mode="2d"] .brain-core {
   transition: border-color 0.2s, background 0.2s;
 }
 .task-row:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.04); }
-.task-row input {
+.task-row input[type="checkbox"] {
   position: absolute;
   opacity: 0;
   width: 1px;

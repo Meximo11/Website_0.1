@@ -102,6 +102,11 @@ function icon(name) {
   return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
 }
 
+/* shortcuts read "Ctrl" outside of Apple platforms */
+const isApplePlatform = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+const modifierLabel = isApplePlatform ? '⌘' : 'Ctrl';
+if (!isApplePlatform) $$('.mod-key').forEach(key => { key.textContent = 'Ctrl'; });
+
 function renderConnections(id) {
   const parent = nodeData[id]?.parent || 'Coding';
   const colorClass = nodeData[id]?.parentColor || 'violet';
@@ -474,7 +479,7 @@ $('#modal-backdrop').addEventListener('click', event => { if (event.target === e
 $('#review-suggestion').addEventListener('click', () => openModal('suggestion'));
 
 $('#notifications-button').addEventListener('click', () => showToast('You have 3 gentle reminders', 'info'));
-$('#help-button').addEventListener('click', () => showToast('Tip: press ⌘ K to search your brain', 'info'));
+$('#help-button').addEventListener('click', () => showToast(`Tip: press ${modifierLabel} K to search your brain`, 'info'));
 $('#settings-button').addEventListener('click', () => showToast('Settings are coming to this local workspace', 'info'));
 $('#add-space').addEventListener('click', () => showToast('New spaces will keep your brain beautifully focused', 'info'));
 $$('.space-item').forEach(button => button.addEventListener('click', () => {
