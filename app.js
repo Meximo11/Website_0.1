@@ -1,546 +1,717 @@
 /* =====================================================================
    BrainDump — app.js
-   Interaction layer for the brain map. Motion is powered by GSAP when it is
-   available (window.gsap) and degrades to plain CSS transitions otherwise.
-   The animated brain (brain-3d.js) is addressed only through DOM events, so
-   each layer works on its own.
+   The memory layer. Everything you type is stored in localStorage and
+   mirrored twice: as a row in the rail and as a node in the brain.
+   The brain renderer (brain-3d.js) is spoken to only through DOM
+   events (braindump:anchors / braindump:project / braindump:pulse ...),
+   so each layer works on its own. The brain starts empty: no demo data,
+   ever.
    ===================================================================== */
 
-const nodeData = {
-  core: { parent: 'Workspace', title: 'My Brain', status: 'Living map', progress: 100, tasks: [], notes: 'A gentle, visual home for everything you think about.', parentColor: 'violet', color: 'violet' },
-  school: { parent: 'My Brain', title: 'School', status: 'In progress', progress: 58, tasks: ['Math exam tomorrow', 'Review English vocabulary', 'Pack school bag'], notes: 'Keep the next step small. Future me will thank me.', parentColor: 'blue', color: 'blue' },
-  coding: { parent: 'My Brain', title: 'Coding', status: 'In progress', progress: 64, tasks: ['Ship the BrainDump prototype', 'Refactor graph interactions', 'Write a short launch note'], notes: 'Make useful things, then make them feel good.', parentColor: 'violet', color: 'violet' },
-  personal: { parent: 'My Brain', title: 'Personal', status: 'In progress', progress: 42, tasks: ['Clean up the desk', 'Plan the weekend'], notes: 'A little space creates a lot of clarity.', parentColor: 'orange', color: 'orange' },
-  ideas: { parent: 'My Brain', title: 'Ideas', status: 'Open', progress: 18, tasks: ['Capture the good ones', 'Pick one to explore'], notes: 'Not every idea needs to become a project today.', parentColor: 'orange', color: 'mint' },
-  math: { parent: 'School', title: 'Math exam', status: 'Deadline soon', progress: 35, tasks: ['Review chapter 4 formulas', 'Solve practice sheet'], notes: 'Tomorrow. Focus on formulas first, then practice.', parentColor: 'blue', color: 'blue', deadline: true },
-  english: { parent: 'School', title: 'English', status: 'Open', progress: 25, tasks: ['Learn vocabulary', 'Read one sample essay'], notes: 'Friday is close, but there is enough time.', parentColor: 'blue', color: 'blue' },
-  website: { parent: 'Coding', title: 'Website', status: 'In progress', progress: 80, tasks: ['Landing page structure', 'Set up navigation', 'Choose color system', 'Build brain map prototype', 'Polish the animations'], completed: 4, notes: 'The first version should feel calm and alive. Add subtle animations without distracting from the thought itself.', parentColor: 'violet', color: 'violet' },
-  godot: { parent: 'Coding', title: 'Godot', status: 'Open', progress: 36, tasks: ['Prototype player movement', 'Find a sound palette'], notes: 'A small experiment is enough for today.', parentColor: 'violet', color: 'violet' },
-  hotel: { parent: 'Personal', title: 'Hotel', status: 'Open', progress: 0, tasks: ['Compare two options'], notes: 'A quiet place with a good breakfast.', parentColor: 'orange', color: 'orange' },
-  budget: { parent: 'Personal', title: 'Budget', status: 'Open', progress: 20, tasks: ['Check subscriptions'], notes: 'Make the invisible visible once a month.', parentColor: 'orange', color: 'orange' },
-  training: { parent: 'Personal', title: 'Training', status: 'Open', progress: 50, tasks: ['Book a session'], notes: 'Consistency over intensity.', parentColor: 'violet', color: 'mint' },
-  travel: { parent: 'Personal', title: 'Travel', status: 'Open', progress: 15, tasks: ['Choose a weekend'], notes: 'Somewhere new, not necessarily far away.', parentColor: 'violet', color: 'mint' }
-};
-
+const STORAGE_KEY = 'braindump:memories:v1';
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
-const stage = $('#brain-stage');
-const detailPanel = $('#detail-panel');
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-let selectedId = 'website';
-let historyIndex = 0;
-let toastTimer;
-let customThoughts = Number(localStorage.getItem('braindump-custom-thoughts') || 0);
-let dragState = null;
-let zoomTween = null;
-let modalTween = null;
-const view = { x: 0, y: 0, zoom: 100 };
-
-/* ---------- motion helpers ---------- */
 const motion = {
   get gsap() { return window.gsap; },
   get on() { return Boolean(window.gsap) && !reducedMotion; }
 };
 
-/* the animated brain listens for these — see brain-3d.js */
-function emit(name, detail = {}) {
-  document.dispatchEvent(new CustomEvent(`braindump:${name}`, { detail }));
-}
+/* ---------- memory store ---------- */
 
-function showToast(message, type = 'success') {
-  const toast = $('#toast');
-  $('#toast-message').textContent = message;
-  $('.toast-icon use', toast).setAttribute('href', type === 'info' ? '#i-sparkle' : '#i-check');
-  toast.classList.add('visible');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('visible'), 2800);
-}
-
-function nodeCount() {
-  return 247 + customThoughts;
-}
-
-function setCountLabels(value) {
-  const rounded = Math.round(value);
-  $('#thought-total').textContent = rounded;
-  $('#visible-count').textContent = `${rounded} thoughts`;
-  $('.brain-core small').textContent = `${rounded} thoughts`;
-  $('.nav-count').textContent = rounded;
-}
-
-function updateCountLabels({ animate = false } = {}) {
-  const target = nodeCount();
-  if (animate && motion.on) {
-    const counter = { value: Number($('#thought-total').textContent) || 0 };
-    motion.gsap.to(counter, { value: target, duration: 1.4, ease: 'power2.out', onUpdate: () => setCountLabels(counter.value) });
-    return;
+function loadMemories() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter(m => m && typeof m.title === 'string' && m.title.trim())
+      .map(m => ({
+        id: String(m.id || makeId()),
+        title: m.title.slice(0, 160),
+        body: typeof m.body === 'string' ? m.body.slice(0, 4000) : '',
+        createdAt: Number(m.createdAt) || Date.now(),
+        updatedAt: Number(m.updatedAt) || Number(m.createdAt) || Date.now()
+      }));
+  } catch (error) {
+    console.warn('[BrainDump] unreadable store, starting clean:', error);
+    return [];
   }
-  setCountLabels(target);
 }
 
-function renderTasks(data) {
-  const list = $('#task-list');
-  list.innerHTML = '';
-  data.tasks.forEach((task, index) => {
-    const done = data.title === 'Website' ? index < (data.completed ?? 0) : false;
-    const label = document.createElement('label');
-    label.className = `task-row${done ? ' done' : ''}`;
-    label.innerHTML = `<input type="checkbox" ${done ? 'checked' : ''} /><span class="checkmark">${icon('check')}</span><span>${escapeHtml(task)}</span>`;
-    list.appendChild(label);
-  });
-  $('#task-count').textContent = data.tasks.length;
-  bindTaskInputs();
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(memories));
 }
 
-function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+function makeId() {
+  if (window.crypto?.randomUUID) return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/* Phosphor icon from the inline sprite in index.html */
+const memories = loadMemories();
+let selectedId = null;
+let query = '';
+let lastDeleted = null;
+let toastTimer = 0;
+let panelStateTimer = 0;
+let saveTimer = 0;
+let deleteArmed = false;
+const markers = new Map();
+
+/* ---------- dom refs ---------- */
+
+const rail = $('#rail');
+const listEl = $('#memory-list');
+const markersEl = $('#memory-markers');
+const stage = $('#brain-stage');
+const panel = $('#memory-panel');
+const titleInput = $('#panel-title');
+const bodyInput = $('#panel-body');
+const composerInput = $('#composer-input');
+const composerSend = $('#composer-send');
+const searchInput = $('#search-input');
+const searchClear = $('#search-clear');
+
+/* ---------- tiny helpers ---------- */
+
 function icon(name) {
   return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
 }
 
-/* shortcuts read "Ctrl" outside of Apple platforms */
-const isApplePlatform = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-const modifierLabel = isApplePlatform ? '⌘' : 'Ctrl';
-if (!isApplePlatform) $$('.mod-key').forEach(key => { key.textContent = 'Ctrl'; });
-
-function renderConnections(id) {
-  const parent = nodeData[id]?.parent || 'Coding';
-  const colorClass = nodeData[id]?.parentColor || 'violet';
-  $('.connection-list').innerHTML = `
-    <button class="connection-chip"><span class="chip-dot ${colorClass}"></span>${escapeHtml(parent)} <span>${icon('arrow-up-right')}</span></button>
-    <button class="connection-chip"><span class="chip-dot blue"></span>${id === 'school' || id === 'math' ? 'Learning' : 'Design system'} <span>${icon('arrow-up-right')}</span></button>
-    <button class="connection-chip"><span class="chip-dot orange"></span>${id === 'personal' ? 'Wellbeing' : 'Personal brand'} <span>${icon('arrow-up-right')}</span></button>`;
+function emit(name, detail = {}) {
+  document.dispatchEvent(new CustomEvent(`braindump:${name}`, { detail }));
 }
 
-function pulseNode(node) {
-  if (!node || !motion.on) return;
-  const icon = $('.node-icon', node) || node;
-  motion.gsap.fromTo(icon, { scale: 1 }, { scale: 1.16, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.inOut', clearProps: 'transform' });
+const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const fullFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+function humanAge(ts) {
+  const diff = (ts - Date.now()) / 1000;
+  const abs = Math.abs(diff);
+  if (abs < 60) return rtf.format(Math.round(diff), 'second');
+  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
+  if (abs < 86400 * 30) return rtf.format(Math.round(diff / 86400), 'day');
+  return dateFmt.format(ts);
 }
 
-function animatePanelRefresh() {
-  if (!motion.on) return;
-  motion.gsap.fromTo('.detail-scroll > *', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.38, stagger: 0.05, ease: 'power3.out', clearProps: 'transform,opacity', overwrite: true });
+function rowDate(ts) {
+  const sameYear = new Date(ts).getFullYear() === new Date().getFullYear();
+  if (Date.now() - ts < 3600 * 1000 * 6 && sameYear) return humanAge(ts);
+  return sameYear ? dateFmt.format(ts) : fullFmt.format(ts);
 }
 
-function selectNode(id, { silent = false } = {}) {
-  const data = nodeData[id];
-  if (!data) return;
-  const changed = selectedId !== id;
-  if (changed) closeNotesEditor(true, { quiet: true });
-  selectedId = id;
-  $$('.thought-node, .brain-core').forEach(node => node.classList.toggle('selected', node.dataset.nodeId === id));
-  $('#panel-parent').textContent = data.parent;
-  $('#panel-title').textContent = data.title;
-  $('#panel-status').textContent = data.status;
-  $('#panel-progress-text').textContent = `${data.progress}%`;
-  $('#panel-progress-bar').style.width = `${data.progress}%`;
-  $('#notes-copy').textContent = data.notes;
-  const pill = $('.status-pill');
-  pill.classList.toggle('deadline-pill', Boolean(data.deadline));
-  pill.classList.toggle('active-pill', !data.deadline);
-  renderTasks(data);
-  renderConnections(id);
-  detailPanel.classList.remove('closed');
+/* ---------- toast ---------- */
 
-  if (silent) return;
-  pulseNode($(`[data-node-id="${id}"]`));
-  if (changed) animatePanelRefresh();
-  emit('pulse', { color: data.color || 'violet', strength: id === 'core' ? 1.4 : 0.8 });
-}
-
-function bindTaskInputs() {
-  $$('.task-row:not(.task-new) input').forEach(input => input.addEventListener('change', event => {
-    const row = event.target.closest('.task-row');
-    row.classList.toggle('done', event.target.checked);
-    const rows = $$('.task-row:not(.task-new)');
-    const completed = rows.filter(task => $('input', task).checked).length;
-    const progress = rows.length ? Math.round((completed / rows.length) * 100) : 0;
-    $('#panel-progress-text').textContent = `${progress}%`;
-    $('#panel-progress-bar').style.width = `${progress}%`;
-    if (nodeData[selectedId]) {
-      nodeData[selectedId].progress = progress;
-      if (selectedId === 'website') nodeData[selectedId].completed = completed;
-    }
-    if (event.target.checked) emit('pulse', { color: 'mint', strength: 0.6 });
-    showToast(event.target.checked ? 'Task completed' : 'Task reopened');
-  }));
-}
-
-$$('[data-node-id]').forEach(node => node.addEventListener('click', () => selectNode(node.dataset.nodeId)));
-$('#close-panel').addEventListener('click', () => detailPanel.classList.add('closed'));
-
-/* ---------- inline editing (no native prompt dialogs) ---------- */
-$('#add-task').addEventListener('click', () => {
-  const list = $('#task-list');
-  const open = $('.task-new', list);
-  if (open) { $('input', open).focus(); return; }
-
-  const row = document.createElement('form');
-  row.className = 'task-row task-new';
-  row.innerHTML = '<span class="checkmark" aria-hidden="true"></span><input type="text" aria-label="New task" placeholder="Name the next small step" maxlength="80" autocomplete="off" /><button type="submit" class="task-save">Add</button>';
-  list.appendChild(row);
-  const input = $('input', row);
-  input.focus();
-  if (motion.on) motion.gsap.from(row, { opacity: 0, y: -6, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
-
-  const close = () => row.remove();
-  input.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
-  input.addEventListener('blur', () => { if (!input.value.trim()) setTimeout(() => { if (!row.contains(document.activeElement)) close(); }, 120); });
-  row.addEventListener('submit', event => {
-    event.preventDefault();
-    const task = input.value.trim();
-    if (!task) { input.focus(); return; }
-    const data = nodeData[selectedId];
-    data.tasks.push(task);
-    renderTasks(data);
-    if (motion.on) motion.gsap.from('.task-row:last-child', { opacity: 0, x: -12, duration: 0.35, ease: 'power3.out', clearProps: 'all' });
-    showToast('Task added to this thought');
-  });
-});
-
-function openNotesEditor() {
-  const data = nodeData[selectedId];
-  const copy = $('#notes-copy');
-  const editor = document.createElement('textarea');
-  editor.id = 'notes-editor';
-  editor.className = 'notes-editor';
-  editor.rows = 4;
-  editor.maxLength = 600;
-  editor.setAttribute('aria-label', 'Notes');
-  editor.value = data.notes;
-  copy.hidden = true;
-  copy.after(editor);
-  editor.focus();
-  editor.setSelectionRange(editor.value.length, editor.value.length);
-  $('#edit-notes').textContent = 'Save';
-  editor.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { event.stopPropagation(); closeNotesEditor(false); }
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) closeNotesEditor(true);
-  });
-}
-
-function closeNotesEditor(save, { quiet = false } = {}) {
-  const editor = $('#notes-editor');
-  if (!editor) return;
-  const data = nodeData[selectedId];
-  const value = editor.value.trim();
-  const changed = save && value && value !== data.notes;
-  if (changed) data.notes = value;
-  const copy = $('#notes-copy');
-  copy.textContent = data.notes;
-  copy.hidden = false;
-  editor.remove();
-  $('#edit-notes').textContent = 'Edit';
-  if (changed && !quiet) showToast('Note updated');
-}
-
-$('#edit-notes').addEventListener('click', () => ($('#notes-editor') ? closeNotesEditor(true) : openNotesEditor()));
-
-$('#archive-action').addEventListener('click', () => {
-  const title = nodeData[selectedId]?.title || 'Thought';
-  const node = $(`[data-node-id="${selectedId}"]`);
-  if (node && selectedId !== 'core') node.classList.add('archived');
-  showToast(`${title} moved to archive`);
-});
-
-$('#delete-action').addEventListener('click', () => {
-  const title = nodeData[selectedId]?.title || 'Thought';
-  const node = $(`[data-node-id="${selectedId}"]`);
-  const finish = () => {
-    if (node && selectedId !== 'core') node.remove();
-    showToast(`${title} removed`, 'info');
-    selectNode('core');
-  };
-  if (node && selectedId !== 'core' && motion.on) {
-    motion.gsap.to(node, { opacity: 0, duration: 0.3, ease: 'power2.in', onComplete: finish });
-    motion.gsap.to($('.node-icon', node), { scale: 0.4, duration: 0.3, ease: 'power2.in' });
+function showToast(message, { tone = 'ok', action = null, onAction = null } = {}) {
+  const toast = $('#toast');
+  $('#toast-message').textContent = message;
+  $('.toast-icon .icon use', toast)?.setAttribute('href', tone === 'warn' ? '#i-trash' : '#i-check');
+  toast.classList.toggle('is-warn', tone === 'warn');
+  toast.classList.add('is-visible');
+  const actionBtn = $('#toast-action');
+  if (action) {
+    actionBtn.textContent = action;
+    actionBtn.hidden = false;
+    actionBtn.onclick = () => {
+      hideToast();
+      onAction?.();
+    };
   } else {
-    finish();
+    actionBtn.hidden = true;
+    actionBtn.onclick = null;
   }
-});
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, action ? 6000 : 2600);
+}
 
-function addThought() {
-  const input = $('#dump-input');
-  const value = input.value.trim();
-  if (!value) {
-    input.focus();
-    showToast('Write whatever is on your mind first', 'info');
-    if (motion.on) motion.gsap.fromTo('.dump-composer', { x: -6 }, { x: 6, duration: 0.07, repeat: 5, yoyo: true, ease: 'sine.inOut', clearProps: 'x' });
-    return;
+function hideToast() {
+  clearTimeout(toastTimer);
+  $('#toast').classList.remove('is-visible');
+}
+
+/* ---------- rendering ---------- */
+
+function filtered() {
+  if (!query) return memories;
+  const needle = query.toLowerCase();
+  return memories.filter(m => (m.title + ' ' + m.body).toLowerCase().includes(needle));
+}
+
+function renderCounts() {
+  const total = memories.length;
+  const shown = filtered().length;
+  $('#top-count').textContent = `${total} ${total === 1 ? 'memory' : 'memories'}`;
+  $('#rail-count').textContent = query ? `${shown} / ${total}` : String(total);
+}
+
+function renderRail() {
+  const visible = new Set(filtered().map(m => m.id));
+  listEl.innerHTML = '';
+  for (const m of memories) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'memory-row';
+    if (!visible.has(m.id)) row.classList.add('is-hidden');
+    if (m.id === selectedId) row.classList.add('is-active');
+    row.dataset.id = m.id;
+    row.innerHTML = `
+      <span class="row-date"></span>
+      <span class="row-title"></span>
+      ${m.body ? '<span class="row-excerpt"></span>' : ''}`;
+    $('.row-date', row).textContent = rowDate(m.createdAt);
+    $('.row-title', row).textContent = m.title;
+    if (m.body) $('.row-excerpt', row).textContent = m.body.replace(/\s+/g, ' ');
+    row.addEventListener('click', () => selectMemory(m.id));
+    row.addEventListener('mouseenter', () => markers.get(m.id)?.classList.add('is-hot'));
+    row.addEventListener('mouseleave', () => markers.get(m.id)?.classList.remove('is-hot'));
+    listEl.appendChild(row);
   }
-  const fragments = value.split(/[.!?]+/).map(part => part.trim()).filter(Boolean);
-  const amount = Math.max(1, fragments.length);
-  customThoughts += amount;
-  localStorage.setItem('braindump-custom-thoughts', customThoughts);
-  updateCountLabels({ animate: true });
-  input.value = '';
-  input.style.height = 'auto';
-  $('#dump-status').textContent = '0 thoughts ready';
-  showToast(`${amount} ${amount === 1 ? 'thought saved' : 'thoughts saved'} to your brain`);
+  $('#rail-empty').hidden = memories.length > 0 || query;
+  const noMatch = $('#rail-no-match');
+  noMatch.hidden = !(query && visible.size === 0);
+  $('#no-match-query').textContent = query;
+}
 
-  const newest = document.createElement('button');
-  newest.className = 'thought-node tiny-node custom-node';
-  newest.dataset.nodeId = `custom-${Date.now()}`;
-  newest.innerHTML = `<span class="node-halo"></span><span class="node-icon">${icon('sparkle')}</span><strong>${escapeHtml((fragments[0] || value).slice(0, 16))}${(fragments[0] || value).length > 16 ? '…' : ''}</strong><small>just now</small>`;
-  newest.style.left = `${38 + Math.random() * 24}%`;
-  newest.style.top = `${18 + Math.random() * 25}%`;
-  $('#node-layer').appendChild(newest);
-  newest.addEventListener('click', () => {
-    nodeData[newest.dataset.nodeId] = { parent: 'Inbox', title: fragments[0] || value, status: 'New thought', progress: 0, tasks: [], notes: value, parentColor: 'violet', color: 'violet' };
-    selectNode(newest.dataset.nodeId);
+function renderMarkers() {
+  const wanted = new Set(memories.map(m => m.id));
+  for (const [id, el] of markers) {
+    if (!wanted.has(id)) {
+      el.remove();
+      markers.delete(id);
+    }
+  }
+  for (const m of memories) {
+    if (markers.has(m.id)) updateMarker(m);
+    else markers.set(m.id, createMarker(m));
+  }
+  emit('anchors', { ids: memories.map(m => m.id) });
+  applySearchToMarkers();
+  if (brainMode() === 'css') layoutRing();
+}
+
+function createMarker(m) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'memory-node is-new';
+  btn.dataset.id = m.id;
+  btn.innerHTML = `
+    <span class="node-anchor">
+      <span class="node-ring" aria-hidden="true"></span>
+      <span class="node-dot" aria-hidden="true"></span>
+      <span class="node-tag"><span class="tag-date"></span><span class="tag-clip"></span></span>
+    </span>`;
+  updateMarker(m, btn);
+  btn.addEventListener('click', event => {
+    event.stopPropagation();
+    selectMemory(m.id);
   });
+  btn.addEventListener('pointerdown', event => event.stopPropagation());
+  markersEl.appendChild(btn);
+  setTimeout(() => btn.classList.remove('is-new'), 1200);
+  return btn;
+}
 
-  emit('burst', { color: 'violet' });
-  if (motion.on) {
-    const g = motion.gsap;
-    g.from(newest, { opacity: 0, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
-    g.from($('.node-icon', newest), { scale: 0, duration: 0.8, ease: 'back.out(2.2)', clearProps: 'transform' });
-    g.fromTo('.send-dump', { scale: 0.85 }, { scale: 1, duration: 0.7, ease: 'elastic.out(1, 0.45)', clearProps: 'transform' });
+function updateMarker(m, el = markers.get(m.id)) {
+  if (!el) return;
+  $('.tag-date', el).textContent = rowDate(m.createdAt);
+  $('.tag-clip', el).textContent = m.title;
+  el.setAttribute('aria-label', `${m.title}. Memory from ${fullFmt.format(m.createdAt)}. Open details.`);
+  el.classList.toggle('is-selected', m.id === selectedId);
+}
+
+function applySearchToMarkers() {
+  const visible = new Set(filtered().map(m => m.id));
+  for (const [id, el] of markers) {
+    el.classList.toggle('is-dim', query ? !visible.has(id) : false);
   }
 }
 
-$('#send-dump').addEventListener('click', addThought);
-$('#dump-input').addEventListener('input', event => {
-  event.target.style.height = 'auto';
-  event.target.style.height = `${Math.min(event.target.scrollHeight, 62)}px`;
-  const count = event.target.value.split(/[.!?,\n]+/).map(part => part.trim()).filter(Boolean).length;
-  $('#dump-status').textContent = `${count} ${count === 1 ? 'thought' : 'thoughts'} ready`;
-});
-$('#dump-input').addEventListener('keydown', event => {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-    event.preventDefault();
-    addThought();
+function renderAll() {
+  renderRail();
+  renderMarkers();
+  renderCounts();
+  $('#stage-empty').hidden = memories.length > 0;
+}
+
+/* ---------- brain tiers ---------- */
+
+function brainMode() {
+  return document.body.dataset.brainMode || 'loading';
+}
+
+/* the 3D/2D tiers project every anchored brain point once per frame and
+   hand us screen coordinates; the CSS tier has nothing, so we spread the
+   markers on a golden-angle ring around the aura */
+document.addEventListener('braindump:project', event => {
+  const nodes = event.detail?.nodes || [];
+  const seen = new Set();
+  for (const node of nodes) {
+    const el = markers.get(node.id);
+    if (!el) continue;
+    seen.add(node.id);
+    el.style.setProperty('--x', `${node.x.toFixed(1)}px`);
+    el.style.setProperty('--y', `${node.y.toFixed(1)}px`);
+    el.classList.toggle('is-back', node.front < 0.02);
+  }
+  for (const [id, el] of markers) {
+    if (!seen.has(id)) el.classList.add('is-back');
   }
 });
 
-document.addEventListener('keydown', event => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault();
-    $('#search-input').focus();
-  }
-  if (event.key === 'Escape') closeModal();
+document.addEventListener('braindump:brain-mode', event => {
+  /* the brain module boots after app.js ran: re-emit the anchors so a cold
+     load with stored memories does not leave the markers parked at center */
+  emit('anchors', { ids: memories.map(m => m.id) });
+  if (event.detail?.mode === 'css') layoutRing();
 });
+
+let ringTimer = 0;
+function layoutRing() {
+  if (brainMode() !== 'css') return;
+  const rect = stage.getBoundingClientRect();
+  const radius = Math.min(rect.width, rect.height) * 0.31;
+  const cx = rect.width / 2;
+  const cy = rect.height * 0.44;
+  memories.forEach((m, i) => {
+    const el = markers.get(m.id);
+    if (!el) return;
+    const angle = i * 2.399963;
+    const jitter = 0.86 + hash(m.id) % 28 / 100;
+    el.style.setProperty('--x', `${(cx + Math.cos(angle) * radius * jitter).toFixed(1)}px`);
+    el.style.setProperty('--y', `${(cy + Math.sin(angle) * radius * 0.72 * jitter).toFixed(1)}px`);
+    el.classList.remove('is-back', 'is-dim');
+    el.classList.toggle('is-dim', Boolean(query) && !filtered().some(v => v.id === m.id));
+  });
+}
+
+function hash(value) {
+  let h = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 1000;
+}
+
+/* if the brain never reports back (offline CDN, blocked context), fall
+   back to the CSS tier instead of waiting forever */
+setTimeout(() => {
+  if (brainMode() === 'loading') {
+    document.body.dataset.brainMode = 'css';
+    layoutRing();
+  }
+}, 4200);
+window.addEventListener('resize', () => layoutRing());
+
+/* ---------- selection + panel ---------- */
+
+function selectMemory(id) {
+  selectedId = id;
+  if (window.matchMedia('(max-width: 1080px)').matches) setRail(false);
+  const m = memories.find(x => x.id === id);
+  $$('.memory-row').forEach(row => row.classList.toggle('is-active', row.dataset.id === id));
+  for (const [markerId, el] of markers) el.classList.toggle('is-selected', markerId === id);
+  if (!m) return;
+  titleInput.value = m.title;
+  bodyInput.value = m.body;
+  $('#panel-date span').textContent = `${fullFmt.format(m.createdAt)} · ${humanAge(m.createdAt)}`;
+  $('#panel-age-text').textContent = humanAge(m.updatedAt);
+  panel.classList.add('is-open');
+  panel.setAttribute('aria-hidden', 'false');
+  emit('focus', { active: true });
+  if (markers.get(id)?.classList.contains('is-back')) emit('face', { id });
+  armDelete(false);
+  autosize(bodyInput);
+  if (motion.on) {
+    motion.gsap.fromTo(panel, { opacity: 0.4 }, { opacity: 1, duration: 0.4, ease: 'power2.out' });
+  }
+}
+
+function closePanel() {
+  flushPanelEdit();
+  selectedId = null;
+  panel.classList.remove('is-open');
+  panel.setAttribute('aria-hidden', 'true');
+  $$('.memory-row').forEach(row => row.classList.remove('is-active'));
+  for (const el of markers.values()) el.classList.remove('is-selected');
+  emit('focus', { active: false });
+}
+
+$('#panel-close').addEventListener('click', closePanel);
+
+titleInput.addEventListener('input', schedulePanelEdit);
+bodyInput.addEventListener('input', () => {
+  autosize(bodyInput);
+  schedulePanelEdit();
+});
+titleInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    bodyInput.focus();
+  }
+});
+
+function schedulePanelEdit() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushPanelEdit, 400);
+}
+
+function flushPanelEdit() {
+  clearTimeout(saveTimer);
+  if (!selectedId) return;
+  const m = memories.find(x => x.id === selectedId);
+  if (!m) return;
+  const nextTitle = titleInput.value.trim() || 'Untitled';
+  const nextBody = bodyInput.value.trim();
+  if (m.title === nextTitle && m.body === nextBody) return;
+  m.title = nextTitle.slice(0, 160);
+  m.body = nextBody.slice(0, 4000);
+  m.updatedAt = Date.now();
+  save();
+  renderRail();
+  updateMarker(m);
+  const state = $('#panel-state');
+  state.classList.add('is-saved');
+  clearTimeout(panelStateTimer);
+  panelStateTimer = setTimeout(() => state.classList.remove('is-saved'), 1400);
+}
+
+function armDelete(next) {
+  deleteArmed = next;
+  $('#panel-delete').hidden = next;
+  $('#panel-delete-confirm').hidden = !next;
+}
+
+$('#panel-delete').addEventListener('click', () => armDelete(true));
+$('#panel-delete-confirm').addEventListener('click', () => {
+  armDelete(false);
+  deleteMemory(selectedId);
+});
+
+/* ---------- add / delete ---------- */
+
+function addMemory(rawText) {
+  const text = rawText.trim();
+  if (!text) return;
+  const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const memory = {
+    id: makeId(),
+    title: (lines[0] || 'Untitled').slice(0, 160),
+    body: lines.slice(1).join('\n').slice(0, 4000),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  memories.unshift(memory);
+  save();
+  renderAll();
+  emit('anchors', { ids: memories.map(m => m.id) });
+  emit('pulse', { color: 'ember', strength: 1.15 });
+  if (memories.length === 1) emit('burst', { color: 'amber' });
+  showToast('Stored. It has a node now.');
+}
+
+function deleteMemory(id) {
+  const index = memories.findIndex(m => m.id === id);
+  if (index < 0) return;
+  const [removed] = memories.splice(index, 1);
+  lastDeleted = { memory: removed, index };
+  closePanel();
+  save();
+  renderAll();
+  showToast('Memory deleted.', {
+    tone: 'warn',
+    action: 'Undo',
+    onAction: () => {
+      if (!lastDeleted) return;
+      memories.splice(lastDeleted.index, 0, lastDeleted.memory);
+      lastDeleted = null;
+      save();
+      renderAll();
+      showToast('Back where it was.');
+    }
+  });
+}
+
+/* ---------- composer ---------- */
+
+function autosize(el) {
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+}
+
+composerInput.addEventListener('input', () => {
+  autosize(composerInput);
+  composerSend.disabled = !composerInput.value.trim();
+});
+
+composerInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    submitComposer();
+  }
+  if (event.key === 'Escape') composerInput.blur();
+});
+
+$('#composer').addEventListener('submit', event => {
+  event.preventDefault();
+  submitComposer();
+});
+
+function submitComposer() {
+  const text = composerInput.value;
+  if (!text.trim()) return;
+  addMemory(text);
+  composerInput.value = '';
+  autosize(composerInput);
+  composerSend.disabled = true;
+}
+
+$('#new-btn').addEventListener('click', () => {
+  composerInput.focus();
+  stage.scrollIntoView({ block: 'nearest' });
+});
+
+/* ---------- search ---------- */
 
 function applySearch() {
-  const raw = $('#search-input').value.trim();
-  const query = raw.toLowerCase();
-  let visible = 0;
-  $$('.thought-node').forEach(node => {
-    const match = !query || node.textContent.toLowerCase().includes(query);
-    node.classList.toggle('search-hidden', !match);
-    if (match) visible++;
-  });
-  $('#visible-count').textContent = query ? `${visible} ${visible === 1 ? 'match' : 'matches'}` : `${nodeCount()} thoughts`;
-  const empty = Boolean(query) && visible === 0;
-  $('#map-empty').hidden = !empty;
-  stage.classList.toggle('search-empty', empty);
-  if (empty) $('#map-empty-query').textContent = raw;
+  query = searchInput.value.trim();
+  searchClear.hidden = !query;
+  renderRail();
+  applySearchToMarkers();
+  renderCounts();
+  if (brainMode() === 'css') layoutRing();
 }
 
-$('#search-input').addEventListener('input', applySearch);
-$('#search-input').addEventListener('keydown', event => {
-  if (event.key === 'Escape' && event.target.value) { event.target.value = ''; applySearch(); }
+searchInput.addEventListener('input', applySearch);
+searchInput.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    searchInput.value = '';
+    applySearch();
+    searchInput.blur();
+  }
+  if (event.key === 'Enter') {
+    const first = filtered()[0];
+    if (first) selectMemory(first.id);
+  }
 });
 
-/* nothing matched: turn the query into the first line of a new thought */
-$('#map-empty-dump').addEventListener('click', () => {
-  const query = $('#search-input').value.trim();
-  $('#search-input').value = '';
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
   applySearch();
-  const input = $('#dump-input');
-  input.value = query;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
+  searchInput.focus();
 });
 
-/* ---------- map transform: pan + zoom ---------- */
-function updateMapTransform() {
-  const zoom = Math.round(view.zoom);
-  const transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom / 100})`;
-  $('#node-layer').style.transform = transform;
-  $('#connections').style.transform = transform;
-  $('#zoom-level').textContent = `${zoom}%`;
+$('#no-match-add').addEventListener('click', () => {
+  composerInput.value = query;
+  searchInput.value = '';
+  applySearch();
+  composerInput.focus();
+  autosize(composerInput);
+  composerSend.disabled = false;
+});
+
+/* ---------- rail drawer + search toggle + about ---------- */
+
+const railToggle = $('#rail-toggle');
+const scrim = $('#scrim');
+
+function setRail(open) {
+  document.body.classList.toggle('rail-open', open);
+  railToggle.setAttribute('aria-expanded', String(open));
+  scrim.hidden = !open;
+}
+
+railToggle.addEventListener('click', () => setRail(!document.body.classList.contains('rail-open')));
+scrim.addEventListener('click', () => {
+  setRail(false);
+  document.body.classList.remove('search-open');
+  $('#search-toggle').setAttribute('aria-expanded', 'false');
+});
+
+const searchToggle = $('#search-toggle');
+searchToggle.addEventListener('click', () => {
+  const open = document.body.classList.toggle('search-open');
+  searchToggle.setAttribute('aria-expanded', String(open));
+  if (open) searchInput.focus();
+});
+
+const aboutBtn = $('#about-btn');
+const aboutPop = $('#about-pop');
+
+function setAbout(open) {
+  aboutPop.hidden = !open;
+  aboutBtn.setAttribute('aria-expanded', String(open));
+}
+
+aboutBtn.addEventListener('click', () => setAbout(aboutPop.hidden));
+document.addEventListener('click', event => {
+  if (!aboutPop.hidden && !aboutPop.contains(event.target) && !aboutBtn.contains(event.target)) {
+    setAbout(false);
+  }
+});
+
+/* ---------- zoom + pan over the whole brain field ---------- */
+
+const view = { x: 0, y: 0, zoom: 100 };
+let dragState = null;
+
+function applyView() {
   emit('transform', { x: view.x, y: view.y, zoom: view.zoom });
 }
-function changeZoom(amount) {
-  const target = Math.max(70, Math.min(140, Math.round(view.zoom / 5) * 5 + amount));
-  if (motion.on) {
-    if (zoomTween) zoomTween.kill();
-    zoomTween = motion.gsap.to(view, { zoom: target, duration: 0.35, ease: 'power2.out', onUpdate: updateMapTransform });
-  } else {
-    view.zoom = target;
-    updateMapTransform();
-  }
-}
-$('#zoom-in').addEventListener('click', () => changeZoom(10));
-$('#zoom-out').addEventListener('click', () => changeZoom(-10));
+
 stage.addEventListener('wheel', event => {
-  if (event.target.closest('.dump-composer')) return;
   event.preventDefault();
-  changeZoom(event.deltaY < 0 ? 5 : -5);
+  const next = view.zoom - Math.sign(event.deltaY) * 8;
+  view.zoom = Math.min(180, Math.max(60, next));
+  applyView();
 }, { passive: false });
+
 stage.addEventListener('pointerdown', event => {
-  if (event.target.closest('button, textarea')) return;
-  dragState = { x: event.clientX, y: event.clientY, offsetX: view.x, offsetY: view.y };
-  stage.setPointerCapture(event.pointerId);
-  stage.classList.add('dragging');
+  if (event.target.closest('.memory-node')) return;
+  dragState = { id: event.pointerId, x: event.clientX - view.x, y: event.clientY - view.y };
+  stage.classList.add('is-dragging');
 });
+
 stage.addEventListener('pointermove', event => {
-  if (!dragState) return;
-  view.x = dragState.offsetX + (event.clientX - dragState.x);
-  view.y = dragState.offsetY + (event.clientY - dragState.y);
-  updateMapTransform();
-});
-stage.addEventListener('pointerup', () => { dragState = null; stage.classList.remove('dragging'); });
-stage.addEventListener('pointercancel', () => { dragState = null; stage.classList.remove('dragging'); });
-
-/* ---------- toolbar ---------- */
-$('#focus-button').addEventListener('click', () => {
-  const active = document.body.classList.toggle('focus-active');
-  $('#focus-button').innerHTML = active ? `${icon('x')} Exit focus` : `${icon('crosshair')} Focus mode`;
-  if (active) selectNode(selectedId, { silent: true });
-  emit('focus', { active });
-  showToast(active ? `Focused on ${nodeData[selectedId]?.title || 'your thought'}` : 'Full brain map restored', 'info');
+  if (!dragState || event.pointerId !== dragState.id) return;
+  view.x = event.clientX - dragState.x;
+  view.y = Math.max(-140, Math.min(140, event.clientY - dragState.y));
+  applyView();
 });
 
-const historyLabels = ['Today', '7 days ago', '30 days ago'];
-$('#history-button').addEventListener('click', () => {
-  historyIndex = (historyIndex + 1) % historyLabels.length;
-  $('#history-label').textContent = historyLabels[historyIndex];
-  stage.classList.toggle('history-muted', historyIndex > 0);
-  emit('nudge', { amount: -0.6 });
-  showToast(`Showing your brain from ${historyLabels[historyIndex].toLowerCase()}`, 'info');
-});
-
-$$('[data-map-mode]').forEach(tab => tab.addEventListener('click', () => {
-  $$('[data-map-mode]').forEach(item => item.classList.remove('active'));
-  tab.classList.add('active');
-  const clusters = tab.dataset.mapMode === 'clusters';
-  document.body.classList.toggle('cluster-mode', clusters);
-  emit('nudge', { amount: clusters ? 1.4 : 1 });
-  showToast(clusters ? 'Cluster view active' : 'Neural view active', 'info');
-}));
-
-$('#filter-button').addEventListener('click', () => {
-  const active = document.body.classList.toggle('filter-active');
-  showToast(active ? 'Showing active thoughts only' : 'All thought types visible', 'info');
-});
-
-/* ---------- modal ---------- */
-function openModal(kind = 'next') {
-  const modal = $('#modal-backdrop');
-  if (kind === 'suggestion') {
-    $('#modal-icon').innerHTML = icon('sparkle');
-    $('#modal-eyebrow').textContent = 'AI suggestion';
-    $('#modal-title').textContent = 'Two thoughts want to connect';
-    $('#modal-copy').textContent = 'BrainDump found a possible link. You are always in control of what becomes part of your map.';
-    $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('code')}</div><div><span>Coding · related thought</span><strong>Launch checklist</strong><small>Added 3 days ago <b>•</b> Similar context</small></div><button id="start-next">Connect ${icon('arrow-right')}</button>`;
-    $('#modal-secondary').textContent = 'Ignore suggestion';
-    $('#start-next').addEventListener('click', () => { closeModal(); emit('pulse', { color: 'violet', strength: 1.2 }); showToast('Thoughts connected'); }, { once: true });
-  } else {
-    $('#modal-icon').innerHTML = icon('lightning');
-    $('#modal-eyebrow').textContent = 'Next up';
-    $('#modal-title').textContent = 'Your next best move';
-    $('#modal-copy').textContent = 'Small progress compounds. Here’s one focused step to move your brain forward.';
-    $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('sigma')}</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start ${icon('arrow-right')}</button>`;
-    $('#modal-secondary').textContent = 'Maybe later';
-    $('#start-next').addEventListener('click', () => { closeModal(); selectNode('math'); showToast('Focus session started'); }, { once: true });
+const endDrag = event => {
+  if (dragState && event.pointerId === dragState.id) {
+    dragState = null;
+    stage.classList.remove('is-dragging');
   }
-  modal.hidden = false;
-  if (motion.on) {
-    if (modalTween) modalTween.kill();
-    modalTween = motion.gsap.timeline()
-      .fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power1.out' })
-      .fromTo('.modal', { opacity: 0, y: 18, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.5)', clearProps: 'transform' }, '<')
-      .from('.modal-icon', { scale: 0.4, rotate: -20, duration: 0.5, ease: 'back.out(2)', clearProps: 'transform' }, '-=0.3');
+};
+
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('dblclick', () => {
+  view.x = 0;
+  view.y = 0;
+  view.zoom = 100;
+  applyView();
+});
+
+/* ---------- export / import ---------- */
+
+$('#export-btn').addEventListener('click', () => {
+  const payload = {
+    app: 'BrainDump',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    memories
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `braindump-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 800);
+  showToast(`Exported ${memories.length} ${memories.length === 1 ? 'memory' : 'memories'}.`);
+});
+
+$('#import-btn').addEventListener('click', () => $('#import-file').click());
+
+$('#import-file').addEventListener('change', async event => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    const incoming = Array.isArray(parsed) ? parsed : parsed?.memories;
+    if (!Array.isArray(incoming)) throw new Error('missing memories array');
+    const existing = new Set(memories.map(m => m.id));
+    let added = 0;
+    for (const item of loadMemoriesFrom(incoming)) {
+      if (existing.has(item.id)) continue;
+      memories.unshift(item);
+      existing.add(item.id);
+      added++;
+    }
+    memories.sort((a, b) => b.createdAt - a.createdAt);
+    save();
+    renderAll();
+    showToast(added ? `Imported ${added} ${added === 1 ? 'memory' : 'memories'}.` : 'Nothing new to import.');
+  } catch (error) {
+    console.warn('[BrainDump] import failed:', error);
+    showToast('That file does not look like a BrainDump export.', { tone: 'warn' });
   }
+});
+
+function loadMemoriesFrom(items) {
+  return items
+    .filter(m => m && typeof m.title === 'string' && m.title.trim())
+    .map(m => ({
+      id: String(m.id || makeId()),
+      title: m.title.slice(0, 160),
+      body: typeof m.body === 'string' ? m.body.slice(0, 4000) : '',
+      createdAt: Number(m.createdAt) || Date.now(),
+      updatedAt: Number(m.updatedAt) || Number(m.createdAt) || Date.now()
+    }));
 }
-function closeModal() {
-  const modal = $('#modal-backdrop');
-  if (modal.hidden) return;
-  if (motion.on) {
-    if (modalTween) modalTween.kill();
-    modalTween = motion.gsap.timeline({ onComplete: () => { modal.hidden = true; motion.gsap.set([modal, '.modal'], { clearProps: 'all' }); } })
-      .to('.modal', { opacity: 0, y: 10, scale: 0.96, duration: 0.2, ease: 'power2.in' })
-      .to(modal, { opacity: 0, duration: 0.2 }, '<');
-  } else {
-    modal.hidden = true;
-  }
-}
-$('#modal-close').addEventListener('click', closeModal);
-$('#modal-secondary').addEventListener('click', closeModal);
-$('#modal-backdrop').addEventListener('click', event => { if (event.target === event.currentTarget) closeModal(); });
-$('#review-suggestion').addEventListener('click', () => openModal('suggestion'));
 
-$('#notifications-button').addEventListener('click', () => showToast('You have 3 gentle reminders', 'info'));
-$('#help-button').addEventListener('click', () => showToast(`Tip: press ${modifierLabel} K to search your brain`, 'info'));
-$('#settings-button').addEventListener('click', () => showToast('Settings are coming to this local workspace', 'info'));
-$('#add-space').addEventListener('click', () => showToast('New spaces will keep your brain beautifully focused', 'info'));
-$$('.space-item').forEach(button => button.addEventListener('click', () => {
-  $$('.space-item').forEach(item => item.classList.remove('selected-space'));
-  button.classList.add('selected-space');
-  const color = $('.space-dot', button)?.classList[1] || 'violet';
-  emit('pulse', { color, strength: 0.7 });
-  showToast(`${button.dataset.space} space selected`, 'info');
-}));
-$$('.nav-item[data-view]').forEach(button => button.addEventListener('click', () => {
-  $$('.nav-item[data-view]').forEach(item => item.classList.remove('active'));
-  button.classList.add('active');
-  if (button.dataset.view !== 'brain-map') showToast(`${button.textContent.trim()} is ready to explore`, 'info');
-}));
+/* ---------- keyboard ---------- */
+
+const isTyping = () => {
+  const el = document.activeElement;
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el?.isContentEditable;
+};
+
+document.addEventListener('keydown', event => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.key === '/' && !isTyping()) {
+    event.preventDefault();
+    document.body.classList.add('search-open');
+    searchInput.focus();
+    return;
+  }
+  if ((event.key === 'n' || event.key === 'N') && !isTyping()) {
+    event.preventDefault();
+    composerInput.focus();
+    return;
+  }
+  if (event.key === '?' && !isTyping()) {
+    event.preventDefault();
+    setAbout(aboutPop.hidden);
+    return;
+  }
+  if (event.key === 'Escape') {
+    if (!aboutPop.hidden) setAbout(false);
+    else if (document.body.classList.contains('rail-open')) setRail(false);
+    else if (selectedId) closePanel();
+  }
+});
 
 /* ---------- entrance ---------- */
-function prepareLineDraw() {
-  // the SVG is stretched (preserveAspectRatio="none"), so pad the dash so it always covers the path
-  return $$('.connection-lines path').map(path => {
-    const length = (path.getTotalLength ? path.getTotalLength() : 0) * 1.5;
-    path.style.strokeDasharray = `${length}`;
-    path.style.strokeDashoffset = `${length}`;
-    return path;
-  });
-}
 
-function runIntro() {
-  const done = () => document.documentElement.classList.remove('is-loading');
-  if (!motion.on) { done(); return; }
-
+function entrance() {
+  if (!motion.on) return;
   const g = motion.gsap;
-  const paths = prepareLineDraw();
-  document.body.classList.add('is-entering'); // CSS transitions pause while GSAP drives the entrance
-  const tl = g.timeline({ defaults: { ease: 'power3.out' }, onComplete: () => {
-    $$('.connection-lines path').forEach(path => { path.style.strokeDasharray = ''; path.style.strokeDashoffset = ''; });
-    document.body.classList.remove('is-entering');
-  } });
-
-  tl.from('.sidebar', { x: -24, opacity: 0, duration: 0.6 })
-    .from('.sidebar .brand, .sidebar .workspace-label, .sidebar .nav-item, .sidebar .space-item, .sidebar .profile-card, .sidebar .local-badge', { y: 10, opacity: 0, stagger: 0.035, duration: 0.45, clearProps: 'transform' }, '-=0.4')
-    .from('.topbar', { y: -14, opacity: 0, duration: 0.5 }, '-=0.6')
-    .from('.map-toolbar', { y: -10, opacity: 0, duration: 0.45 }, '-=0.4')
-    .from('.brain-stage', { scale: 0.985, opacity: 0, duration: 0.7, clearProps: 'transform' }, '-=0.45')
-    .from('.brain-core', { scale: 0.6, opacity: 0, duration: 1, ease: 'back.out(1.6)', clearProps: 'transform,opacity' }, '-=0.35')
-    .to(paths, { strokeDashoffset: 0, duration: 1.1, stagger: 0.04, ease: 'power2.inOut' }, '-=0.8')
-    .from('.thought-node', { opacity: 0, duration: 0.5, stagger: { each: 0.045, from: 'center' }, clearProps: 'opacity' }, '-=1')
-    .from('.thought-node .node-icon', { scale: 0, duration: 0.7, ease: 'back.out(2)', stagger: { each: 0.045, from: 'center' }, clearProps: 'transform' }, '<')
-    .from(['.map-status', '.map-hint', '.map-legend'], { opacity: 0, y: 8, stagger: 0.08, duration: 0.4, clearProps: 'transform,opacity' }, '-=0.7')
-    .from('.dump-composer', { y: 30, opacity: 0, duration: 0.6, clearProps: 'transform,opacity' }, '-=0.6')
-    .from('.detail-panel', { x: 30, opacity: 0, duration: 0.6, clearProps: 'transform,opacity' }, '-=0.8')
-    .from('.bottom-stats > div', { y: 10, opacity: 0, stagger: 0.05, duration: 0.4, clearProps: 'transform,opacity' }, '-=0.6');
-
-  // initial states are applied synchronously by the from() tweens — safe to reveal now
-  done();
-
-  const counter = { value: 0 };
-  g.to(counter, { value: nodeCount(), duration: 1.8, ease: 'power2.out', delay: 0.6, onUpdate: () => setCountLabels(counter.value) });
+  try {
+    g.from('.topbar', { y: -16, opacity: 0, duration: 0.7, ease: 'power3.out' });
+    g.from('.rail', { opacity: 0, x: -14, duration: 0.7, delay: 0.1, ease: 'power3.out' });
+    g.from('.composer', { y: 26, opacity: 0, duration: 0.8, delay: 0.15, ease: 'power3.out' });
+    if (memories.length) g.from('.memory-row', { opacity: 0, y: 10, duration: 0.5, stagger: 0.035, delay: 0.2, ease: 'power2.out' });
+    else g.from('.stage-empty', { opacity: 0, y: 14, duration: 0.8, delay: 0.3, ease: 'power3.out' });
+  } catch (error) {
+    /* motion is optional by design */
+  }
 }
 
-setCountLabels(nodeCount());
-selectNode('website', { silent: true });
-// on compact screens the panel is an overlay — keep the map visible until a thought is tapped
-if (window.matchMedia('(max-width: 1120px)').matches) detailPanel.classList.add('closed');
-runIntro();
+/* ---------- go ---------- */
+
+renderAll();
+entrance();
+
+/* keep "edited x ago" honest while the panel stays open */
+setInterval(() => {
+  if (!selectedId) return;
+  const m = memories.find(x => x.id === selectedId);
+  if (m) $('#panel-age-text').textContent = humanAge(m.updatedAt);
+}, 60 * 1000);
