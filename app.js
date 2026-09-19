@@ -432,7 +432,7 @@ function openModal(kind = 'next') {
   const modal = $('#modal-backdrop');
   if (kind === 'suggestion') {
     $('#modal-icon').innerHTML = icon('sparkle');
-    $('#modal-eyebrow').textContent = 'AI SUGGESTION';
+    $('#modal-eyebrow').textContent = 'AI suggestion';
     $('#modal-title').textContent = 'Two thoughts want to connect';
     $('#modal-copy').textContent = 'BrainDump found a possible link. You are always in control of what becomes part of your map.';
     $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('code')}</div><div><span>Coding · related thought</span><strong>Launch checklist</strong><small>Added 3 days ago <b>•</b> Similar context</small></div><button id="start-next">Connect ${icon('arrow-right')}</button>`;
@@ -440,7 +440,7 @@ function openModal(kind = 'next') {
     $('#start-next').addEventListener('click', () => { closeModal(); emit('pulse', { color: 'violet', strength: 1.2 }); showToast('Thoughts connected'); }, { once: true });
   } else {
     $('#modal-icon').innerHTML = icon('lightning');
-    $('#modal-eyebrow').textContent = 'NEXT UP';
+    $('#modal-eyebrow').textContent = 'Next up';
     $('#modal-title').textContent = 'Your next best move';
     $('#modal-copy').textContent = 'Small progress compounds. Here’s one focused step to move your brain forward.';
     $('.next-task-card').innerHTML = `<div class="next-task-icon">${icon('sigma')}</div><div><span>School <i>·</i> Tomorrow</span><strong>Review chapter 4 formulas</strong><small>About 25 minutes <b>•</b> High impact</small></div><button id="start-next">Start ${icon('arrow-right')}</button>`;
