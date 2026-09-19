@@ -121,6 +121,7 @@ function selectNode(id, { silent = false } = {}) {
   const data = nodeData[id];
   if (!data) return;
   const changed = selectedId !== id;
+  if (changed) closeNotesEditor(true, { quiet: true });
   selectedId = id;
   $$('.thought-node, .brain-core').forEach(node => node.classList.toggle('selected', node.dataset.nodeId === id));
   $('#panel-parent').textContent = data.parent;
@@ -143,10 +144,10 @@ function selectNode(id, { silent = false } = {}) {
 }
 
 function bindTaskInputs() {
-  $$('.task-row input').forEach(input => input.addEventListener('change', event => {
+  $$('.task-row:not(.task-new) input').forEach(input => input.addEventListener('change', event => {
     const row = event.target.closest('.task-row');
     row.classList.toggle('done', event.target.checked);
-    const rows = $$('.task-row');
+    const rows = $$('.task-row:not(.task-new)');
     const completed = rows.filter(task => $('input', task).checked).length;
     const progress = rows.length ? Math.round((completed / rows.length) * 100) : 0;
     $('#panel-progress-text').textContent = `${progress}%`;
@@ -163,24 +164,72 @@ function bindTaskInputs() {
 $$('[data-node-id]').forEach(node => node.addEventListener('click', () => selectNode(node.dataset.nodeId)));
 $('#close-panel').addEventListener('click', () => detailPanel.classList.add('closed'));
 
+/* ---------- inline editing (no native prompt dialogs) ---------- */
 $('#add-task').addEventListener('click', () => {
-  const task = window.prompt('Neue Aufgabe für diesen Gedanken:');
-  if (!task?.trim()) return;
-  const data = nodeData[selectedId];
-  data.tasks.push(task.trim());
-  renderTasks(data);
-  if (motion.on) motion.gsap.from('.task-row:last-child', { opacity: 0, x: -12, duration: 0.35, ease: 'power3.out', clearProps: 'all' });
-  showToast('Task added to this thought');
+  const list = $('#task-list');
+  const open = $('.task-new', list);
+  if (open) { $('input', open).focus(); return; }
+
+  const row = document.createElement('form');
+  row.className = 'task-row task-new';
+  row.innerHTML = '<span class="checkmark" aria-hidden="true"></span><input type="text" aria-label="New task" placeholder="Name the next small step" maxlength="80" autocomplete="off" /><button type="submit" class="task-save">Add</button>';
+  list.appendChild(row);
+  const input = $('input', row);
+  input.focus();
+  if (motion.on) motion.gsap.from(row, { opacity: 0, y: -6, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
+
+  const close = () => row.remove();
+  input.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+  input.addEventListener('blur', () => { if (!input.value.trim()) setTimeout(() => { if (!row.contains(document.activeElement)) close(); }, 120); });
+  row.addEventListener('submit', event => {
+    event.preventDefault();
+    const task = input.value.trim();
+    if (!task) { input.focus(); return; }
+    const data = nodeData[selectedId];
+    data.tasks.push(task);
+    renderTasks(data);
+    if (motion.on) motion.gsap.from('.task-row:last-child', { opacity: 0, x: -12, duration: 0.35, ease: 'power3.out', clearProps: 'all' });
+    showToast('Task added to this thought');
+  });
 });
 
-$('#edit-notes').addEventListener('click', () => {
+function openNotesEditor() {
   const data = nodeData[selectedId];
-  const updated = window.prompt('Notiz bearbeiten:', data.notes);
-  if (updated === null) return;
-  data.notes = updated.trim() || data.notes;
-  $('#notes-copy').textContent = data.notes;
-  showToast('Note updated');
-});
+  const copy = $('#notes-copy');
+  const editor = document.createElement('textarea');
+  editor.id = 'notes-editor';
+  editor.className = 'notes-editor';
+  editor.rows = 4;
+  editor.maxLength = 600;
+  editor.setAttribute('aria-label', 'Notes');
+  editor.value = data.notes;
+  copy.hidden = true;
+  copy.after(editor);
+  editor.focus();
+  editor.setSelectionRange(editor.value.length, editor.value.length);
+  $('#edit-notes').textContent = 'Save';
+  editor.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.stopPropagation(); closeNotesEditor(false); }
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) closeNotesEditor(true);
+  });
+}
+
+function closeNotesEditor(save, { quiet = false } = {}) {
+  const editor = $('#notes-editor');
+  if (!editor) return;
+  const data = nodeData[selectedId];
+  const value = editor.value.trim();
+  const changed = save && value && value !== data.notes;
+  if (changed) data.notes = value;
+  const copy = $('#notes-copy');
+  copy.textContent = data.notes;
+  copy.hidden = false;
+  editor.remove();
+  $('#edit-notes').textContent = 'Edit';
+  if (changed && !quiet) showToast('Note updated');
+}
+
+$('#edit-notes').addEventListener('click', () => ($('#notes-editor') ? closeNotesEditor(true) : openNotesEditor()));
 
 $('#archive-action').addEventListener('click', () => {
   const title = nodeData[selectedId]?.title || 'Thought';
@@ -267,15 +316,37 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeModal();
 });
 
-$('#search-input').addEventListener('input', event => {
-  const query = event.target.value.trim().toLowerCase();
+function applySearch() {
+  const raw = $('#search-input').value.trim();
+  const query = raw.toLowerCase();
   let visible = 0;
   $$('.thought-node').forEach(node => {
     const match = !query || node.textContent.toLowerCase().includes(query);
     node.classList.toggle('search-hidden', !match);
     if (match) visible++;
   });
-  $('#visible-count').textContent = query ? `${visible} matches` : `${nodeCount()} thoughts`;
+  $('#visible-count').textContent = query ? `${visible} ${visible === 1 ? 'match' : 'matches'}` : `${nodeCount()} thoughts`;
+  const empty = Boolean(query) && visible === 0;
+  $('#map-empty').hidden = !empty;
+  stage.classList.toggle('search-empty', empty);
+  if (empty) $('#map-empty-query').textContent = raw;
+}
+
+$('#search-input').addEventListener('input', applySearch);
+$('#search-input').addEventListener('keydown', event => {
+  if (event.key === 'Escape' && event.target.value) { event.target.value = ''; applySearch(); }
+});
+
+/* nothing matched: turn the query into the first line of a new thought */
+$('#map-empty-dump').addEventListener('click', () => {
+  const query = $('#search-input').value.trim();
+  $('#search-input').value = '';
+  applySearch();
+  const input = $('#dump-input');
+  input.value = query;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 });
 
 /* ---------- map transform: pan + zoom ---------- */
