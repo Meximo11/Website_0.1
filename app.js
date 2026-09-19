@@ -82,6 +82,12 @@ function emit(name, detail = {}) {
   document.dispatchEvent(new CustomEvent(`braindump:${name}`, { detail }));
 }
 
+/* brain-3d fills the neural blueprint oldest-first: the first memory is
+   the seed neuron and every later one grows the structure outward */
+function syncAnchors() {
+  emit('anchors', { ids: memories.map(m => m.id).reverse() });
+}
+
 const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 const fullFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -186,7 +192,7 @@ function renderMarkers() {
     if (markers.has(m.id)) updateMarker(m);
     else markers.set(m.id, createMarker(m));
   }
-  emit('anchors', { ids: memories.map(m => m.id) });
+  syncAnchors();
   applySearchToMarkers();
   if (brainMode() === 'css') layoutRing();
 }
@@ -223,9 +229,13 @@ function updateMarker(m, el = markers.get(m.id)) {
 
 function applySearchToMarkers() {
   const visible = new Set(filtered().map(m => m.id));
+  const dimmed = [];
   for (const [id, el] of markers) {
-    el.classList.toggle('is-dim', query ? !visible.has(id) : false);
+    const hide = query ? !visible.has(id) : false;
+    el.classList.toggle('is-dim', hide);
+    if (hide) dimmed.push(id);
   }
+  emit('dim', { ids: query ? dimmed : null });
 }
 
 function renderAll() {
@@ -233,6 +243,7 @@ function renderAll() {
   renderMarkers();
   renderCounts();
   $('#stage-empty').hidden = memories.length > 0;
+  document.body.classList.toggle('is-empty', memories.length === 0);
 }
 
 /* ---------- brain tiers ---------- */
@@ -247,23 +258,26 @@ function brainMode() {
 document.addEventListener('braindump:project', event => {
   const nodes = event.detail?.nodes || [];
   const seen = new Set();
+  // nothing occludes a young network; back-side dimming only starts to
+  // read once there is real depth between the neurons
+  const occludes = memories.length > 8;
   for (const node of nodes) {
     const el = markers.get(node.id);
     if (!el) continue;
     seen.add(node.id);
     el.style.setProperty('--x', `${node.x.toFixed(1)}px`);
     el.style.setProperty('--y', `${node.y.toFixed(1)}px`);
-    el.classList.toggle('is-back', node.front < 0.02);
+    el.classList.toggle('is-back', occludes && node.front < -0.18);
   }
   for (const [id, el] of markers) {
-    if (!seen.has(id)) el.classList.add('is-back');
+    if (!seen.has(id)) el.classList.toggle('is-back', occludes);
   }
 });
 
 document.addEventListener('braindump:brain-mode', event => {
   /* the brain module boots after app.js ran: re-emit the anchors so a cold
      load with stored memories does not leave the markers parked at center */
-  emit('anchors', { ids: memories.map(m => m.id) });
+  syncAnchors();
   if (event.detail?.mode === 'css') layoutRing();
 });
 
@@ -313,6 +327,7 @@ function selectMemory(id) {
   const m = memories.find(x => x.id === id);
   $$('.memory-row').forEach(row => row.classList.toggle('is-active', row.dataset.id === id));
   for (const [markerId, el] of markers) el.classList.toggle('is-selected', markerId === id);
+  emit('select', { id });
   if (!m) return;
   titleInput.value = m.title;
   bodyInput.value = m.body;
@@ -336,6 +351,7 @@ function closePanel() {
   panel.setAttribute('aria-hidden', 'true');
   $$('.memory-row').forEach(row => row.classList.remove('is-active'));
   for (const el of markers.values()) el.classList.remove('is-selected');
+  emit('select', { id: null });
   emit('focus', { active: false });
 }
 
@@ -406,7 +422,6 @@ function addMemory(rawText) {
   memories.unshift(memory);
   save();
   renderAll();
-  emit('anchors', { ids: memories.map(m => m.id) });
   emit('pulse', { color: 'ember', strength: 1.15 });
   if (memories.length === 1) emit('burst', { color: 'amber' });
   showToast('Stored. It has a node now.');
@@ -550,51 +565,6 @@ document.addEventListener('click', event => {
   if (!aboutPop.hidden && !aboutPop.contains(event.target) && !aboutBtn.contains(event.target)) {
     setAbout(false);
   }
-});
-
-/* ---------- zoom + pan over the whole brain field ---------- */
-
-const view = { x: 0, y: 0, zoom: 100 };
-let dragState = null;
-
-function applyView() {
-  emit('transform', { x: view.x, y: view.y, zoom: view.zoom });
-}
-
-stage.addEventListener('wheel', event => {
-  event.preventDefault();
-  const next = view.zoom - Math.sign(event.deltaY) * 8;
-  view.zoom = Math.min(180, Math.max(60, next));
-  applyView();
-}, { passive: false });
-
-stage.addEventListener('pointerdown', event => {
-  if (event.target.closest('.memory-node')) return;
-  dragState = { id: event.pointerId, x: event.clientX - view.x, y: event.clientY - view.y };
-  stage.classList.add('is-dragging');
-});
-
-stage.addEventListener('pointermove', event => {
-  if (!dragState || event.pointerId !== dragState.id) return;
-  view.x = event.clientX - dragState.x;
-  view.y = Math.max(-140, Math.min(140, event.clientY - dragState.y));
-  applyView();
-});
-
-const endDrag = event => {
-  if (dragState && event.pointerId === dragState.id) {
-    dragState = null;
-    stage.classList.remove('is-dragging');
-  }
-};
-
-stage.addEventListener('pointerup', endDrag);
-stage.addEventListener('pointercancel', endDrag);
-stage.addEventListener('dblclick', () => {
-  view.x = 0;
-  view.y = 0;
-  view.zoom = 100;
-  applyView();
 });
 
 /* ---------- export / import ---------- */

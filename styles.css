@@ -495,8 +495,14 @@ kbd {
 .layout {
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  min-height: 100dvh;
+  /* one screen tall, so a long memory list scrolls inside the rail and
+     never stretches the stage below the canvas centre */
+  height: 100dvh;
   padding-top: calc(var(--topbar-h) + 34px);
+}
+
+.layout > * {
+  min-height: 0;
 }
 
 /* ---------- rail: the list of what is real ---------- */
@@ -677,18 +683,18 @@ kbd {
   min-height: calc(100dvh - var(--topbar-h) - 34px);
   overflow: hidden;
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: none; /* a finger on the brain spins the brain */
 }
 
 .stage.is-dragging {
   cursor: grabbing;
+  user-select: none;
 }
 
+/* the brain holds the exact centre; only the network turns */
 .brain-field {
   position: absolute;
   inset: 0;
-  transform-origin: 50% 44%;
-  will-change: transform;
 }
 
 .brain-field::before {
@@ -697,6 +703,13 @@ kbd {
   inset: 0;
   background: radial-gradient(34% 34% at 50% 44%, rgba(227, 176, 97, 0.07), transparent 70%);
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.8s var(--ease-out);
+}
+
+/* empty brain, empty light: nothing on the stage until a memory exists */
+body.is-empty .brain-field::before {
+  opacity: 0;
 }
 
 .brain-layer {
@@ -764,7 +777,16 @@ body[data-brain-mode="css"] .brain-field::before {
   transition:
     width 0.25s var(--ease-out),
     height 0.25s var(--ease-out),
-    box-shadow 0.25s var(--ease-out);
+    box-shadow 0.25s var(--ease-out),
+    opacity 0.4s var(--ease-out);
+}
+
+/* when the canvas is drawing the network, the DOM marker is its hit area
+   and label only — a second dot under the canvas dot would look doubled */
+body[data-brain-mode="webgl"] .memory-node .node-dot,
+body[data-brain-mode="2d"] .memory-node .node-dot {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
 }
 
 .node-ring {
@@ -1292,6 +1314,8 @@ body[data-brain-mode="css"] .brain-field::before {
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 100dvh;
   }
 
   .rail {

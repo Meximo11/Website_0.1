@@ -1,21 +1,38 @@
 /* =====================================================================
    BrainDump — brain-3d.js
-   A living neural brain for the centre of the map.
+   The brain is not a decoration: it is the memory list, drawn as a
+   neural network. There is no brain at the start. The first memory you
+   store seeds one neuron; every memory after it adds the next node and
+   the link that grows the structure toward a brain silhouette.
+
+   Layout: a deterministic farthest-point ordering of a brain-shaped
+   point cloud (two wrinkled hemispheres, inner neurons, cerebellum,
+   stem). Memory i owns slot i in that order, so old memories form the
+   core and the network densifies outward. Each slot knows its parent
+   (the nearest earlier slot), which keeps the structure connected.
 
    Rendering tiers (chosen automatically, in this order):
      1. WebGL  — Three.js, loaded on demand from a CDN     → body[data-brain-mode="webgl"]
-     2. 2D     — same point cloud, software-projected onto
-                 a Canvas 2D context (no WebGL, no network) → body[data-brain-mode="2d"]
-     3. CSS    — the glyph core from styles.css only        → body[data-brain-mode="css"]
+     2. 2D     — same network, software-projected on a
+                 Canvas 2D context (no WebGL, no network)  → body[data-brain-mode="2d"]
+     3. CSS    — no canvas; app.js spreads markers on a
+                 golden-angle ring instead                 → body[data-brain-mode="css"]
 
    Force a tier for testing with ?brain=webgl | 2d | css
 
    The module never depends on app.js. app.js talks to it through DOM events:
-     braindump:transform  { x, y, zoom }      keep the brain aligned with the map
-     braindump:pulse      { color, strength } a thought was selected / touched
-     braindump:burst      { color }           a new thought entered the brain
-     braindump:focus      { active }          focus mode on / off
-     braindump:nudge      { amount }          give the brain a little spin
+     braindump:anchors  { ids }     memory ids, OLDEST FIRST (slot order)
+     braindump:select   { id|null } highlight one neuron
+     braindump:dim      { ids|null } fade these memories (search)
+     braindump:pulse    { color, strength }
+     braindump:burst    { color }    a memory entered the brain
+     braindump:face     { id }       rotate that memory into view
+     braindump:focus    { active }   detail panel open
+   and it answers every frame with:
+     braindump:project  { nodes: [{ id, x, y, front }] }
+
+   Drag anywhere on the stage to spin the brain; it stays fixed in the
+   middle. No pan, no zoom, on purpose.
    ===================================================================== */
 (function () {
   'use strict';
@@ -42,63 +59,12 @@
     sage: [0.6, 0.72, 0.6],
     white: [0.94, 0.91, 0.85]
   };
-  const CLASS_COLORS = [PALETTE.slate, PALETTE.ember, PALETTE.amber];
-
-  /* ------------------------------------------------------------------
-     shared animation state (both renderers read from here)
-     ------------------------------------------------------------------ */
-  const state = {
-    mode: 'loading',
-    time: 0,
-    rotY: -0.7,
-    yawOffset: 0,
-    targetYaw: 0,
-    tiltX: 0.22,
-    targetTiltX: 0.22,
-    tiltZ: 0,
-    targetTiltZ: 0,
-    spin: reducedMotion ? 0 : 0.14,
-    boost: 0,
-    pulse: 0,
-    pulseTweened: false,
-    pulseColor: PALETTE.ember,
-    intro: reducedMotion ? 1 : 0,
-    introTweened: false,
-    focus: 1,
-    targetFocus: 1,
-    activity: 1,
-    paused: document.hidden,
-    anchorIds: []
-  };
-
-  const BURST_COUNT = 56;
-  const burst = {
-    active: false,
-    life: 0,
-    dirty: false,
-    color: PALETTE.ember,
-    pos: new Float32Array(BURST_COUNT * 3),
-    vel: new Float32Array(BURST_COUNT * 3)
-  };
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
   const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const brighten = (c, k) => [Math.min(1, c[0] * k), Math.min(1, c[1] * k), Math.min(1, c[2] * k)];
   const rgba = (c, a) => `rgba(${Math.round(c[0] * 255)}, ${Math.round(c[1] * 255)}, ${Math.round(c[2] * 255)}, ${a})`;
-
-  /* deterministic random so the brain looks the same on every visit */
-  function hashString(value) {
-    let h = 2166136261;
-    for (let i = 0; i < value.length; i++) {
-      h ^= value.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-  function anchorIndex(id, mod) {
-    return mod > 0 ? hashString(String(id)) % mod : 0;
-  }
 
   function mulberry32(seed) {
     let a = seed >>> 0;
@@ -111,31 +77,78 @@
   }
 
   /* ------------------------------------------------------------------
-     brain geometry — two wrinkled hemispheres, inner neurons,
-     a cerebellum and a short brain stem, plus synapse links
+     shared state
      ------------------------------------------------------------------ */
-  function buildBrain(profile) {
+  const state = {
+    mode: 'loading',
+    time: 0,
+    rotY: -0.55,
+    yawOffset: 0,
+    targetYaw: 0,
+    tiltX: 0.18,
+    targetTiltX: 0.18,
+    tiltZ: 0,
+    targetTiltZ: 0,
+    spin: reducedMotion ? 0 : 0.055,
+    boost: 0,
+    pulse: 0,
+    pulseTweened: false,
+    pulseColor: PALETTE.ember,
+    intro: reducedMotion ? 1 : 0,
+    introTweened: false,
+    focus: 1,
+    targetFocus: 1,
+    activity: 1,
+    paused: document.hidden,
+    ids: [],
+    idToSlot: new Map(),
+    selectedId: null,
+    selected: -1,
+    dim: null,
+    dirty: false,
+    drag: { active: false, id: -1, x: 0, y: 0, t: 0, velYaw: 0 }
+  };
+
+  const BURST_COUNT = 56;
+  const burst = {
+    active: false,
+    life: 0,
+    dirty: false,
+    color: PALETTE.ember,
+    pos: new Float32Array(BURST_COUNT * 3),
+    vel: new Float32Array(BURST_COUNT * 3)
+  };
+
+  /* ------------------------------------------------------------------
+     the blueprint — a brain-shaped point cloud ordered so that the
+     k-th memory lands on the k-th structural slot.
+
+     Farthest-point sampling spreads the early slots across the whole
+     silhouette (the brain is readable from the very first memories),
+     while later slots fill in the gaps. parent[k] is the nearest earlier
+     slot, so the drawn graph is always one connected piece.
+
+     Per slot we also keep color/size/phase; the current positions live
+     in `cur`, which eases toward the blueprint whenever the memory order
+     changes (delete an old memory and the rest glide into their new
+     places instead of teleporting).
+     ------------------------------------------------------------------ */
+  function buildStructure(profile) {
     const rand = mulberry32(20260919);
-    const { surface, inner, cerebellum, stem, maxLinks, linkDistance } = profile;
+    const { surface, inner, cerebellum, stem } = profile;
     const count = surface + inner + cerebellum + stem;
 
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
-    const phases = new Float32Array(count);
-    const classes = new Uint8Array(count);
+    /* master cloud: raw brain points, unordered */
+    const mpos = new Float32Array(count * 3);
+    const mt = new Float32Array(count);        /* back→front factor */
+    const mkind = new Uint8Array(count);       /* 0 cortex, 1 inner, 2 cerebellum, 3 stem */
+    const mjit = new Float32Array(count * 2);  /* per-point brightness/size jitter */
     let n = 0;
 
-    const push = (x, y, z, rgb, size, cls) => {
-      positions[n * 3] = x;
-      positions[n * 3 + 1] = y;
-      positions[n * 3 + 2] = z;
-      colors[n * 3] = rgb[0];
-      colors[n * 3 + 1] = rgb[1];
-      colors[n * 3 + 2] = rgb[2];
-      sizes[n] = size;
-      phases[n] = rand();
-      classes[n] = cls;
+    const push = (x, y, z, t, kind) => {
+      mpos[n * 3] = x; mpos[n * 3 + 1] = y; mpos[n * 3 + 2] = z;
+      mt[n] = t; mkind[n] = kind;
+      mjit[n * 2] = rand(); mjit[n * 2 + 1] = rand();
       n++;
     };
 
@@ -169,10 +182,7 @@
       pz += (pz / len) * g;
       px += side * 0.3;                                   // hemisphere gap
 
-      const t = (pz + 1) / 2;                             // back → front : stone → bone
-      let rgb = brighten(mix(PALETTE.slate, PALETTE.white, t), 0.72 + rand() * 0.5);
-      if (rand() < 0.04) rgb = brighten(PALETTE.ember, 0.9 + rand() * 0.5); // a few live synapses
-      push(px, py, pz, rgb, 0.55 + rand() * 0.75, t > 0.5 ? 0 : 1);
+      push(px, py, pz, (pz + 1) / 2, 0);
     }
 
     for (let i = 0; i < inner; i++) {
@@ -185,8 +195,7 @@
         side * 0.3 + s * Math.cos(phi) * 0.45 * r,
         u * 0.58 * r,
         s * Math.sin(phi) * 0.85 * r,
-        brighten(PALETTE.amber, 0.3 + rand() * 0.3),
-        0.45 + rand() * 0.5,
+        0.5,
         1
       );
     }
@@ -200,8 +209,7 @@
         s * Math.cos(phi) * 0.4 * ridges,
         -0.44 + u * 0.2,
         -0.66 + s * Math.sin(phi) * 0.26 * ridges,
-        brighten(mix(PALETTE.sage, PALETTE.white, rand()), 0.5 + rand() * 0.4),
-        0.6 + rand() * 0.6,
+        0.2,
         2
       );
     }
@@ -210,102 +218,153 @@
       const a = rand() * Math.PI * 2;
       const r = 0.09 + rand() * 0.06;
       const yy = -0.36 - rand() * 0.42;
-      push(Math.cos(a) * r, yy, -0.32 + Math.sin(a) * r * 0.8 - (yy + 0.36) * 0.35, brighten(PALETTE.slate, 0.6 + rand() * 0.3), 0.55 + rand() * 0.4, 1);
+      push(Math.cos(a) * r, yy, -0.32 + Math.sin(a) * r * 0.8 - (yy + 0.36) * 0.35, 0.35, 3);
     }
 
-    const { pairs, adjacency } = buildLinks(positions, count, linkDistance, maxLinks, rand);
-    return { count, surfaceCount: surface, positions, colors, sizes, phases, classes, pairs, adjacency, rand };
-  }
+    /* farthest-point ordering (first slot = nearest to the centroid) */
+    let cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < count; i++) { cx += mpos[i * 3]; cy += mpos[i * 3 + 1]; cz += mpos[i * 3 + 2]; }
+    cx /= count; cy /= count; cz /= count;
 
-  /* nearest-neighbour links via a uniform grid */
-  function buildLinks(positions, count, dist, maxLinks, rand, perPoint = 3) {
-    const cell = dist;
-    const grid = new Map();
-    const keyOf = (ix, iy, iz) => `${ix},${iy},${iz}`;
+    const order = new Int32Array(count);
+    const slotOf = new Int32Array(count).fill(-1);      /* master idx → slot */
+    const d2min = new Float64Array(count).fill(Infinity);
+    const nearest = new Int32Array(count).fill(-1);
+    let first = 0, best = Infinity;
     for (let i = 0; i < count; i++) {
-      const k = keyOf(Math.floor(positions[i * 3] / cell), Math.floor(positions[i * 3 + 1] / cell), Math.floor(positions[i * 3 + 2] / cell));
-      const bucket = grid.get(k);
-      if (bucket) bucket.push(i); else grid.set(k, [i]);
+      const dx = mpos[i * 3] - cx, dy = mpos[i * 3 + 1] - cy, dz = mpos[i * 3 + 2] - cz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < best) { best = d2; first = i; }
     }
-
-    const order = Array.from({ length: count }, (_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
+    order[0] = first;
+    slotOf[first] = 0;
+    for (let i = 0; i < count; i++) {
+      const dx = mpos[i * 3] - mpos[first * 3], dy = mpos[i * 3 + 1] - mpos[first * 3 + 1], dz = mpos[i * 3 + 2] - mpos[first * 3 + 2];
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < d2min[i]) { d2min[i] = d2; nearest[i] = first; }
     }
-
-    const pairs = [];
-    const seen = new Set();
-    const d2max = dist * dist;
-    outer: for (const i of order) {
-      const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
-      const ix = Math.floor(x / cell), iy = Math.floor(y / cell), iz = Math.floor(z / cell);
-      const candidates = [];
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
-        const bucket = grid.get(keyOf(ix + dx, iy + dy, iz + dz));
-        if (!bucket) continue;
-        for (const j of bucket) {
-          if (j === i) continue;
-          const ex = positions[j * 3] - x, ey = positions[j * 3 + 1] - y, ez = positions[j * 3 + 2] - z;
-          const d2 = ex * ex + ey * ey + ez * ez;
-          if (d2 < d2max) candidates.push([d2, j]);
-        }
+    for (let k = 1; k < count; k++) {
+      let pick = -1, far = -1;
+      for (let i = 0; i < count; i++) {
+        if (slotOf[i] !== -1) continue;
+        if (d2min[i] > far) { far = d2min[i]; pick = i; }
       }
-      candidates.sort((a, b) => a[0] - b[0]);
-      for (let c = 0; c < Math.min(perPoint, candidates.length); c++) {
-        const j = candidates[c][1];
-        const a = Math.min(i, j), b = Math.max(i, j);
-        const k = a * count + b;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        pairs.push(a, b);
-        if (pairs.length / 2 >= maxLinks) break outer;
+      order[k] = pick;
+      slotOf[pick] = k;
+      for (let i = 0; i < count; i++) {
+        if (slotOf[i] !== -1) continue;
+        const dx = mpos[i * 3] - mpos[pick * 3], dy = mpos[i * 3 + 1] - mpos[pick * 3 + 1], dz = mpos[i * 3 + 2] - mpos[pick * 3 + 2];
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < d2min[i]) { d2min[i] = d2; nearest[i] = pick; }
       }
     }
 
-    const adjacency = Array.from({ length: count }, () => []);
-    for (let l = 0; l < pairs.length / 2; l++) {
-      adjacency[pairs[l * 2]].push(l);
-      adjacency[pairs[l * 2 + 1]].push(l);
+    /* reorder into per-slot arrays + tiny organic jitter */
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const phases = new Float32Array(count);
+    const cls = new Uint8Array(count);            /* 0 slate · 1 bone · 2 ember · 3 amber */
+    const parent = new Int32Array(count).fill(-1);
+    const children = Array.from({ length: count }, () => []);
+
+    for (let k = 0; k < count; k++) {
+      const i = order[k];
+      const j1 = mjit[i * 2], j2 = mjit[i * 2 + 1];
+      let x = mpos[i * 3] + (j1 - 0.5) * 0.05;
+      let y = mpos[i * 3 + 1] + (j2 - 0.5) * 0.05;
+      let z = mpos[i * 3 + 2] + (j1 * j2 - 0.5) * 0.05;
+      positions[k * 3] = x; positions[k * 3 + 1] = y; positions[k * 3 + 2] = z;
+
+      const kind = mkind[i];
+      const t = mt[i];
+      let rgb;
+      if (kind === 1) { rgb = brighten(PALETTE.amber, 0.5 + j1 * 0.35); cls[k] = 3; }
+      else if (kind === 2) { rgb = brighten(mix(PALETTE.sage, PALETTE.white, j1), 0.55 + j2 * 0.4); cls[k] = 1; }
+      else if (kind === 3) { rgb = brighten(PALETTE.slate, 0.6 + j1 * 0.35); cls[k] = 0; }
+      else {
+        rgb = brighten(mix(PALETTE.slate, PALETTE.white, t), 0.78 + j1 * 0.4); // cortex: back stone → front bone
+        cls[k] = t > 0.5 ? 1 : 0;
+        if (j2 < 0.06) { rgb = brighten(PALETTE.ember, 0.9 + j1 * 0.5); cls[k] = 2; } // a few live neurons
+      }
+      for (let c = 0; c < 3; c++) colors[k * 3 + c] = rgb[c];
+      sizes[k] = (kind === 0 ? 0.95 : 0.8) + j1 * (kind === 0 ? 0.7 : 0.5);
+      phases[k] = rand();
+
+      if (k > 0 && nearest[i] >= 0) {
+        const p = slotOf[nearest[i]];
+        if (p >= 0) { parent[k] = p; children[p].push(k); }
+      }
+      if (parent[k] < 0 && k > 0) { parent[k] = k - 1; children[k - 1].push(k); }
     }
-    return { pairs: Int32Array.from(pairs), adjacency };
+
+    /* neighbours for the travelling signals (parent + children) */
+    const neighbors = Array.from({ length: count }, (_, k) => {
+      const list = children[k].slice();
+      if (parent[k] >= 0) list.push(parent[k]);
+      return list;
+    });
+
+    return {
+      count, positions, colors, sizes, phases, cls, parent, children, neighbors, rand,
+      cur: positions.slice(),
+      flash: new Float32Array(count)
+    };
   }
 
   /* ------------------------------------------------------------------
-     signals — little sparks travelling along the synapses
+     signals — little sparks travelling along the synapses that exist
      ------------------------------------------------------------------ */
-  function newSignal(brain, fromPoint) {
-    const linkCount = brain.pairs.length / 2;
-    let link;
-    const adj = fromPoint != null ? brain.adjacency[fromPoint] : null;
-    if (adj && adj.length) link = adj[Math.floor(brain.rand() * adj.length)];
-    else link = Math.floor(brain.rand() * linkCount);
-    let a = brain.pairs[link * 2];
-    let b = brain.pairs[link * 2 + 1];
-    if (fromPoint != null && b === fromPoint) { const t = a; a = b; b = t; }
-    return { from: a, to: b, t: fromPoint == null ? brain.rand() : 0, speed: 0.45 + brain.rand() * 0.8 };
+  function visibleCount(struct) {
+    return Math.min(state.ids.length, struct.count);
   }
-  function createSignals(brain, amount) {
+
+  function newSignal(struct, fromPoint, visible) {
+    if (fromPoint != null) {
+      const list = struct.neighbors[fromPoint];
+      if (list.length) {
+        const c = list[Math.floor(struct.rand() * list.length)];
+        const hi = Math.max(fromPoint, c), lo = Math.min(fromPoint, c);
+        if (lo >= 0 && hi < visible) return { from: lo === fromPoint ? lo : hi, to: hi === fromPoint ? lo : hi, t: 0, speed: 0.5 + struct.rand() * 0.9 };
+      }
+    }
+    if (visible < 2) return { from: 0, to: 0, t: struct.rand(), speed: 0 };
+    const b = 1 + Math.floor(struct.rand() * (visible - 1));
+    const a = struct.parent[b] >= 0 && struct.parent[b] < b ? struct.parent[b] : b - 1;
+    return { from: a, to: b, t: struct.rand(), speed: 0.5 + struct.rand() * 0.9 };
+  }
+
+  function createSignals(struct, amount) {
     const list = [];
-    for (let i = 0; i < amount; i++) list.push(newSignal(brain, null));
+    for (let i = 0; i < amount; i++) list.push({ from: 0, to: 0, t: 0, speed: 0 });
     return list;
   }
-  function updateSignals(signals, brain, dt) {
+
+  function updateSignals(signals, struct, dt, visible) {
+    const wanted = clamp(Math.floor(visible / 2), 0, signals.length);
     const speedMul = (0.6 + state.activity * 0.6) * (1 + state.pulse * 1.5) * (reducedMotion ? 0.35 : 1);
-    for (const s of signals) {
+    for (let i = 0; i < signals.length; i++) {
+      const s = signals[i];
+      if (i >= wanted) { s.speed = 0; continue; }
+      if (s.speed === 0 || s.from < 0 || s.to <= 0 || s.from >= visible || s.to >= visible) {
+        Object.assign(s, newSignal(struct, null, visible));
+        if (s.speed === 0) continue;
+      }
       s.t += dt * s.speed * speedMul;
-      if (s.t >= 1) Object.assign(s, newSignal(brain, s.to));
+      if (s.t >= 1) Object.assign(s, newSignal(struct, s.to, visible));
     }
+    return wanted;
   }
-  function signalPosition(s, positions, out, offset) {
+
+  function signalPosition(s, cur, out, offset) {
     const a = s.from * 3, b = s.to * 3, t = s.t;
-    out[offset] = positions[a] + (positions[b] - positions[a]) * t;
-    out[offset + 1] = positions[a + 1] + (positions[b + 1] - positions[a + 1]) * t;
-    out[offset + 2] = positions[a + 2] + (positions[b + 2] - positions[a + 2]) * t;
+    out[offset] = cur[a] + (cur[b] - cur[a]) * t;
+    out[offset + 1] = cur[a + 1] + (cur[b + 1] - cur[a + 1]) * t;
+    out[offset + 2] = cur[a + 2] + (cur[b + 2] - cur[a + 2]) * t;
   }
 
   /* ------------------------------------------------------------------
-     burst — when a new thought enters the brain
+     burst — when a new memory enters the brain
      ------------------------------------------------------------------ */
   function spawnBurst(rgb) {
     burst.active = true;
@@ -326,6 +385,7 @@
       burst.vel[i * 3 + 2] = dz * speed;
     }
   }
+
   function updateBurst(dt) {
     if (!burst.active) return;
     burst.life -= dt / 1.25;
@@ -338,6 +398,60 @@
   }
 
   /* ------------------------------------------------------------------
+     anchors — the memory list, oldest first, mapped onto the blueprint
+     ------------------------------------------------------------------ */
+  let structure = null; // set once a renderer starts; used by face()
+  let appliedCap = -1;    // forces a slot rebuild when the tier changes
+
+  function slotOfMemory(i, capacity) {
+    return i % capacity;
+  }
+
+  function applyAnchors(ids) {
+    if (!structure) return;
+    const cap = structure.count;
+    const prev = state.ids;
+    const changed = appliedCap !== cap || prev.length !== ids.length || ids.some((id, i) => prev[i] !== id);
+    if (!changed) return;
+    const tierSwitch = appliedCap !== cap && prev.length === ids.length;
+    appliedCap = cap;
+
+    // new or reshuffled slots flash and slide in from their parent
+    for (let i = 0; i < Math.min(ids.length, cap); i++) {
+      if (tierSwitch || prev[i] === ids[i]) continue;
+      const s = slotOfMemory(i, cap);
+      structure.flash[s] = 1;
+      if (i >= prev.length) {
+        const from = structure.parent[s] >= 0 ? structure.parent[s] : Math.max(0, i - 1);
+        for (let c = 0; c < 3; c++) structure.cur[s * 3 + c] = structure.cur[from * 3 + c];
+      }
+    }
+    state.ids = ids.slice();
+    state.idToSlot.clear();
+    for (let i = 0; i < ids.length; i++) state.idToSlot.set(ids[i], slotOfMemory(i, cap));
+    state.selected = state.selectedId != null ? (state.idToSlot.get(state.selectedId) ?? -1) : -1;
+    state.dirty = true;
+  }
+
+  /* ease cur toward the blueprint whenever the order changed */
+  function settle(dt) {
+    if (!structure) return false;
+    const vis = visibleCount(structure);
+    const k = 1 - Math.exp(-dt * 5.5);
+    const target = structure.positions;
+    const cur = structure.cur;
+    let moving = false;
+    for (let i = 0; i < vis; i++) {
+      const s = slotOfMemory(i, structure.count);
+      for (let c = 0; c < 3; c++) {
+        const delta = target[s * 3 + c] - cur[s * 3 + c];
+        if (Math.abs(delta) > 0.0004) { cur[s * 3 + c] += delta * k; moving = true; }
+      }
+    }
+    return moving;
+  }
+
+  /* ------------------------------------------------------------------
      shared per-frame integration
      ------------------------------------------------------------------ */
   function step(dt) {
@@ -345,21 +459,29 @@
     if (!state.pulseTweened) state.pulse *= Math.exp(-dt * 3.4);
     if (!state.introTweened && state.intro < 1) state.intro = Math.min(1, state.intro + dt / 1.6);
     state.boost *= Math.exp(-dt * 1.6);
-    state.rotY += (state.spin * state.activity + state.boost) * dt;
-    const k = 1 - Math.exp(-dt * 4.5);
+    if (!state.drag.active) state.rotY += (state.spin * state.activity + state.boost) * dt;
+    const k = 1 - Math.exp(-dt * 10);
     state.yawOffset += (state.targetYaw - state.yawOffset) * k;
     state.tiltX += (state.targetTiltX - state.tiltX) * k;
     state.tiltZ += (state.targetTiltZ - state.tiltZ) * k;
     state.focus += (state.targetFocus - state.focus) * (1 - Math.exp(-dt * 5));
+    if (structure) {
+      let flashMax = 0;
+      const f = structure.flash;
+      for (let i = 0; i < f.length; i++) {
+        if (f[i] > 0) { f[i] = f[i] * Math.exp(-dt * 1.1); if (f[i] < 0.01) f[i] = 0; else flashMax = Math.max(flashMax, f[i]); }
+      }
+      state.flashActive = flashMax > 0;
+    }
   }
 
   function currentScale() {
     const e = easeOutCubic(state.intro);
     const breathe = 1 + Math.sin(state.time * 1.1) * 0.018 * state.activity;
-    return (0.55 + 0.45 * e) * breathe * (1 + state.pulse * 0.1);
+    return (0.72 + 0.28 * e) * breathe * (1 + state.pulse * 0.1);
   }
   function currentYaw() {
-    return state.rotY + state.yawOffset - (1 - easeOutCubic(state.intro)) * 1.2;
+    return state.rotY + state.yawOffset;
   }
   function currentAlpha() {
     return easeOutCubic(state.intro) * state.focus;
@@ -381,27 +503,47 @@
     const g = window.gsap;
     if (!g) return; // manual fallback in step()
     state.introTweened = true;
-    g.to(state, { intro: 1, duration: 2.2, ease: 'expo.out', delay: 0.2, onComplete: () => { state.introTweened = false; } });
+    g.to(state, { intro: 1, duration: 1.4, ease: 'expo.out', delay: 0.1, onComplete: () => { state.introTweened = false; } });
   }
 
   /* ------------------------------------------------------------------
-     pointer parallax + lifecycle
+     drag to spin — the brain holds its place, the world turns
      ------------------------------------------------------------------ */
-  if (!reducedMotion) {
-    stage.addEventListener('pointermove', event => {
-      const rect = stage.getBoundingClientRect();
-      const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const ny = ((event.clientY - rect.top) / rect.height) * 2 - 1;
-      state.targetYaw = nx * 0.35;
-      state.targetTiltX = 0.22 + ny * 0.2;
-      state.targetTiltZ = -nx * 0.08;
-    });
-    stage.addEventListener('pointerleave', () => {
-      state.targetYaw = 0;
-      state.targetTiltX = 0.22;
-      state.targetTiltZ = 0;
-    });
-  }
+  stage.addEventListener('pointerdown', event => {
+    if (event.target.closest('.memory-node, button, a, input, textarea, .panel, .toast')) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    state.drag.active = true;
+    state.drag.id = event.pointerId;
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    state.drag.t = event.timeStamp;
+    state.drag.velYaw = 0;
+    stage.classList.add('is-dragging');
+    if (stage.setPointerCapture) { try { stage.setPointerCapture(event.pointerId); } catch (error) { /* ignore */ } }
+  });
+
+  stage.addEventListener('pointermove', event => {
+    const d = state.drag;
+    if (!d.active || event.pointerId !== d.id) return;
+    const dx = event.clientX - d.x, dy = event.clientY - d.y;
+    d.x = event.clientX;
+    d.y = event.clientY;
+    const dtMove = Math.max(8, event.timeStamp - d.t) / 1000;
+    d.t = event.timeStamp;
+    state.targetYaw += dx * 0.0062;
+    state.targetTiltX = clamp(state.targetTiltX - dy * 0.0045, -0.5, 0.85);
+    d.velYaw = 0.75 * d.velYaw + 0.25 * (dx * 0.0062 / dtMove);
+  });
+
+  const endDrag = event => {
+    const d = state.drag;
+    if (!d.active || event.pointerId !== d.id) return;
+    d.active = false;
+    stage.classList.remove('is-dragging');
+    state.boost = clamp(d.velYaw * 2.2, -3.2, 3.2); // inertia; step() decays it back to the calm idle spin
+  };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
   document.addEventListener('visibilitychange', () => { state.paused = document.hidden; });
 
   let activeRenderer = null;
@@ -420,6 +562,14 @@
     }
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
+  }
+
+  /* alpha multiplier for a slot: search-dim, selection boost */
+  function slotAlpha(s, visible) {
+    let a = 1;
+    if (state.dim && state.dim.has(s)) a *= 0.22;
+    if (s === state.selected) a *= 1.12;
+    return a;
   }
 
   /* ------------------------------------------------------------------
@@ -478,7 +628,10 @@
   }
 
   function startWebGL(THREE) {
-    const brain = buildBrain({ surface: 2100, inner: 160, cerebellum: 200, stem: 40, maxLinks: 1100, linkDistance: 0.17 });
+    const brain = buildStructure({ surface: 1500, inner: 120, cerebellum: 140, stem: 30 });
+    structure = brain;
+    const cap = brain.count;
+
     const canvas = document.createElement('canvas');
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
     renderer.setClearColor(0x000000, 0);
@@ -493,7 +646,7 @@
     const uniforms = {
       uTime: { value: 0 },
       uPixelRatio: { value: renderer.getPixelRatio() },
-      uPointPx: { value: 2.7 },
+      uPointPx: { value: 3.6 },
       uCamDist: { value: 8 },
       uPulse: { value: 0 },
       uOpacity: { value: 0 },
@@ -509,48 +662,46 @@
       blending: THREE.AdditiveBlending
     });
 
-    /* neurons */
+    /* neurons (only the first visible slots are drawn) */
+    const drawPos = new Float32Array(cap * 3);
+    const drawCol = new Float32Array(cap * 3);
+    const drawSize = new Float32Array(cap);
+    const drawAlpha = new Float32Array(cap);
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(brain.positions, 3));
-    geo.setAttribute('aColor', new THREE.BufferAttribute(brain.colors, 3));
-    geo.setAttribute('aSize', new THREE.BufferAttribute(brain.sizes, 1));
+    geo.setAttribute('position', new THREE.BufferAttribute(drawPos, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aColor', new THREE.BufferAttribute(drawCol, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(drawSize, 1).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('aPhase', new THREE.BufferAttribute(brain.phases, 1));
-    geo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(brain.count).fill(1), 1));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(drawAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+    geo.setDrawRange(0, 0);
     const points = new THREE.Points(geo, pointMaterial);
     points.renderOrder = 3;
+    points.frustumCulled = false;
     group.add(points);
 
-    /* synapses */
-    const linkCount = brain.pairs.length / 2;
-    const linePositions = new Float32Array(linkCount * 6);
-    const lineColors = new Float32Array(linkCount * 6);
-    for (let l = 0; l < linkCount; l++) {
-      const a = brain.pairs[l * 2], b = brain.pairs[l * 2 + 1];
-      for (let c = 0; c < 3; c++) {
-        linePositions[l * 6 + c] = brain.positions[a * 3 + c];
-        linePositions[l * 6 + 3 + c] = brain.positions[b * 3 + c];
-        lineColors[l * 6 + c] = brain.colors[a * 3 + c] * 0.9;
-        lineColors[l * 6 + 3 + c] = brain.colors[b * 3 + c] * 0.9;
-      }
-    }
+    /* synapses — one link per memory after the first */
+    const linePositions = new Float32Array(cap * 6);
+    const lineColors = new Float32Array(cap * 6);
     const lineGeo = new THREE.BufferGeometry();
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-    lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3).setUsage(THREE.DynamicDrawUsage));
+    lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3).setUsage(THREE.DynamicDrawUsage));
+    lineGeo.setDrawRange(0, 0);
     const lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
     const lines = new THREE.LineSegments(lineGeo, lineMaterial);
     lines.renderOrder = 2;
+    lines.frustumCulled = false;
     group.add(lines);
 
     /* travelling signals */
-    const SIGNALS = 28;
+    const SIGNALS = 24;
     const signals = createSignals(brain, SIGNALS);
     const signalPositions = new Float32Array(SIGNALS * 3);
     const signalGeo = new THREE.BufferGeometry();
     signalGeo.setAttribute('position', new THREE.BufferAttribute(signalPositions, 3).setUsage(THREE.DynamicDrawUsage));
     signalGeo.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(SIGNALS * 3).map((_, i) => PALETTE.white[i % 3]), 3));
-    signalGeo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(SIGNALS).fill(2.4), 1));
+    signalGeo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(SIGNALS).fill(2.6), 1));
     signalGeo.setAttribute('aPhase', new THREE.BufferAttribute(new Float32Array(SIGNALS).map(() => brain.rand()), 1));
-    signalGeo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(SIGNALS).fill(1), 1));
+    signalGeo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(SIGNALS).fill(0), 1));
     const signalPoints = new THREE.Points(signalGeo, pointMaterial);
     signalPoints.renderOrder = 4;
     signalPoints.frustumCulled = false;
@@ -568,30 +719,65 @@
     burstPoints.frustumCulled = false;
     group.add(burstPoints);
 
-    /* soft glow behind and a bright core inside */
+    /* the warmth that settles over the network as it grows */
     const glowTexture = makeGlowTexture(THREE);
     const glowMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xc98a52, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
     const glow = new THREE.Sprite(glowMaterial);
     glow.renderOrder = 0;
     scene.add(glow);
-    const coreMaterial = new THREE.SpriteMaterial({ map: glowTexture, color: 0xb9ac92, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
-    const core = new THREE.Sprite(coreMaterial);
-    core.renderOrder = 1;
-    scene.add(core);
+
+    let lastCount = -1;
+    let lastMoving = true;
+
+    function syncBuffers(visible) {
+      const cur = brain.cur;
+      const flash = brain.flash;
+      for (let i = 0; i < visible; i++) {
+        const s = slotOfMemory(i, cap);
+        const fl = flash[s];
+        const sel = s === state.selected;
+        for (let c = 0; c < 3; c++) {
+          drawPos[i * 3 + c] = cur[s * 3 + c];
+          let col = brain.colors[s * 3 + c];
+          if (fl > 0) col += (PALETTE.ember[c] - col) * fl * 0.65;
+          drawCol[i * 3 + c] = Math.min(1, col + (sel ? 0.12 : 0));
+        }
+        drawSize[i] = brain.sizes[s] * (1 + fl * 1.1 + (sel ? 0.5 : 0));
+        drawAlpha[i] = slotAlpha(s, visible) * (1 + fl * 0.4);
+      }
+      for (let i = 1; i < visible; i++) {
+        const s = slotOfMemory(i, cap);
+        const p = i < cap && brain.parent[s] >= 0 ? brain.parent[s] : slotOfMemory(i - 1, cap);
+        for (let c = 0; c < 3; c++) {
+          linePositions[i * 6 - 3 + c] = cur[p * 3 + c];
+          linePositions[i * 6 + c] = cur[s * 3 + c];
+          lineColors[i * 6 - 3 + c] = brain.colors[p * 3 + c] * 0.75;
+          lineColors[i * 6 + c] = brain.colors[s * 3 + c] * 0.75;
+        }
+      }
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.aColor.needsUpdate = true;
+      geo.attributes.aSize.needsUpdate = true;
+      geo.attributes.aAlpha.needsUpdate = true;
+      lineGeo.attributes.position.needsUpdate = true;
+      lineGeo.attributes.color.needsUpdate = true;
+      geo.setDrawRange(0, visible);
+      lineGeo.setDrawRange(0, Math.max(0, visible - 1) * 2);
+    }
 
     function fit() {
       const w = Math.max(1, layer.clientWidth);
       const h = Math.max(1, layer.clientHeight);
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-      const desiredPx = clamp(Math.min(w, h) * 0.42, 170, 300);   // brain footprint in CSS pixels
+      const desiredPx = clamp(Math.min(w, h) * 0.42, 170, 300);   // network footprint in CSS pixels
       const worldSpan = 2.3;
       const camDist = (worldSpan * h / desiredPx) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
       camera.position.set(0, 0.1, camDist);
       camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
       uniforms.uCamDist.value = camDist;
-      uniforms.uPointPx.value = 2.7 * (desiredPx / 220);
+      uniforms.uPointPx.value = 3.6 * (desiredPx / 220);
       uniforms.uPixelRatio.value = renderer.getPixelRatio();
     }
     const unobserve = observeSize(fit);
@@ -607,10 +793,16 @@
       const dt = clamp((now - last) / 1000, 0, 0.05);
       last = now;
       step(dt);
-      updateSignals(signals, brain, dt);
+      const moving = settle(dt);
+      const visible = visibleCount(brain);
+      const dynamic = moving || lastMoving || visible !== lastCount || state.flashActive || state.dirty;
+      if (dynamic) syncBuffers(visible);
+      if (state.dirty) state.dirty = false;
+      lastMoving = moving; lastCount = visible;
+      updateSignals(signals, brain, dt, visible);
       updateBurst(dt);
 
-      const alpha = currentAlpha();
+      const alpha = currentAlpha() * (visible > 0 ? 1 : 0);
       group.rotation.set(state.tiltX, currentYaw(), state.tiltZ);
       group.scale.setScalar(currentScale());
 
@@ -618,17 +810,24 @@
       uniforms.uPulse.value = state.pulse;
       uniforms.uOpacity.value = alpha;
       uniforms.uPulseColor.value.set(state.pulseColor[0], state.pulseColor[1], state.pulseColor[2]);
-      lineMaterial.opacity = (0.13 + state.pulse * 0.22) * alpha;
-      glowMaterial.opacity = (0.17 + state.pulse * 0.4) * alpha;
+      const density = Math.min(1, visible / 24);
+      lineMaterial.opacity = (0.16 + state.pulse * 0.22) * alpha;
+      glowMaterial.opacity = (0.04 + 0.15 * density + state.pulse * 0.4) * alpha;
       glowMaterial.color.setRGB(state.pulseColor[0], state.pulseColor[1], state.pulseColor[2]).lerp(new THREE.Color(0xb9a68c), 1 - Math.min(1, state.pulse));
-      const glowScale = 2.5 + state.pulse * 0.7 + Math.sin(state.time * 0.9) * 0.08;
+      const glowScale = (1.4 + 1.4 * Math.min(1, visible / 120) + state.pulse * 0.6 + Math.sin(state.time * 0.9) * 0.08) * (visible > 0 ? 1 : 0);
       glow.scale.set(glowScale, glowScale, 1);
-      coreMaterial.opacity = (0.2 + state.pulse * 0.5) * alpha;
-      const coreScale = 0.9 + state.pulse * 0.25;
-      core.scale.set(coreScale, coreScale, 1);
 
-      for (let i = 0; i < SIGNALS; i++) signalPosition(signals[i], brain.positions, signalPositions, i * 3);
-      signalGeo.attributes.position.needsUpdate = true;
+      if (visible > 0) {
+        for (let i = 0; i < SIGNALS; i++) {
+          signalGeo.attributes.aAlpha.array[i] = i < Math.floor(visible / 2) ? 1 : 0;
+          signalPosition(signals[i], brain.cur, signalPositions, i * 3);
+        }
+        signalGeo.attributes.position.needsUpdate = true;
+        signalGeo.attributes.aAlpha.needsUpdate = true;
+        signalGeo.setDrawRange(0, clamp(Math.floor(visible / 2), 0, SIGNALS));
+      } else {
+        signalGeo.setDrawRange(0, 0);
+      }
 
       if (burst.active || burst.dirty) {
         const alphaAttr = burstGeo.attributes.aAlpha;
@@ -650,19 +849,19 @@
 
       renderer.render(scene, camera);
 
-      if (state.anchorIds.length) {
+      if (visible > 0) {
         group.updateMatrixWorld(true);
         camera.updateMatrixWorld();
         const w = layer.clientWidth;
         const h = layer.clientHeight;
         const v = new THREE.Vector3();
         const nodes = [];
-        for (const id of state.anchorIds) {
-          const i = anchorIndex(id, brain.surfaceCount) * 3;
-          v.set(brain.positions[i], brain.positions[i + 1], brain.positions[i + 2]).applyMatrix4(group.matrixWorld);
+        for (let i = 0; i < visible; i++) {
+          const s = slotOfMemory(i, cap);
+          v.set(brain.cur[s * 3], brain.cur[s * 3 + 1], brain.cur[s * 3 + 2]).applyMatrix4(group.matrixWorld);
           const front = v.z;
           v.applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
-          nodes.push({ id, x: (v.x / v.w * 0.5 + 0.5) * w, y: (0.5 - v.y / v.w * 0.5) * h, front });
+          nodes.push({ id: state.ids[i], x: (v.x / v.w * 0.5 + 0.5) * w, y: (0.5 - v.y / v.w * 0.5) * h, front });
         }
         document.dispatchEvent(new CustomEvent('braindump:project', { detail: { nodes } }));
       }
@@ -673,7 +872,7 @@
       cancelAnimationFrame(raf);
       unobserve();
       geo.dispose(); lineGeo.dispose(); signalGeo.dispose(); burstGeo.dispose();
-      pointMaterial.dispose(); lineMaterial.dispose(); glowMaterial.dispose(); coreMaterial.dispose(); glowTexture.dispose();
+      pointMaterial.dispose(); lineMaterial.dispose(); glowMaterial.dispose(); glowTexture.dispose();
       renderer.dispose();
       canvas.remove();
     }
@@ -691,7 +890,7 @@
   }
 
   /* ------------------------------------------------------------------
-     tier 2 — Canvas 2D (software projection of the same brain)
+     tier 2 — Canvas 2D (software projection of the same network)
      ------------------------------------------------------------------ */
   function makeSprite(rgb, size) {
     const c = document.createElement('canvas');
@@ -708,23 +907,26 @@
   }
 
   function start2D() {
-    const brain = buildBrain({ surface: 820, inner: 80, cerebellum: 110, stem: 24, maxLinks: 420, linkDistance: 0.21 });
+    const brain = buildStructure({ surface: 620, inner: 50, cerebellum: 80, stem: 20 });
+    structure = brain;
+    const cap = brain.count;
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) throw new Error('Canvas 2D context unavailable');
     layer.replaceChildren(canvas);
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const sprites = CLASS_COLORS.map(c => makeSprite(c, 48));
+    const sprites = [PALETTE.slate, PALETTE.white, PALETTE.ember, PALETTE.amber].map(c => makeSprite(c, 48));
     const whiteSprite = makeSprite(PALETTE.white, 48);
     let burstSprite = makeSprite(PALETTE.ember, 48);
     let burstSpriteColor = PALETTE.ember;
 
-    const SIGNALS = 22;
+    const SIGNALS = 16;
     const signals = createSignals(brain, SIGNALS);
-    const projected = new Float32Array(brain.count * 3);
+    const projected = new Float32Array(cap * 3);
     const tmp = new Float32Array(3);
-    let w = 0, h = 0, cx = 0, cy = 0, pxPerUnit = 90, pointPx = 3;
+    let w = 0, h = 0, cx = 0, cy = 0, pxPerUnit = 90, pointPx = 3.6;
 
     function fit() {
       w = Math.max(1, layer.clientWidth);
@@ -736,7 +938,7 @@
       cy = h / 2;
       const desiredPx = clamp(Math.min(w, h) * 0.42, 170, 300);
       pxPerUnit = desiredPx / 2.3;
-      pointPx = 2.7 * (desiredPx / 220);
+      pointPx = 3.6 * (desiredPx / 220);
     }
     const unobserve = observeSize(fit);
 
@@ -764,10 +966,12 @@
       const dt = clamp((now - last) / 1000, 0, 0.05);
       last = now;
       step(dt);
-      updateSignals(signals, brain, dt);
+      settle(dt);
+      const visible = visibleCount(brain);
+      updateSignals(signals, brain, dt, visible);
       updateBurst(dt);
 
-      const alpha = currentAlpha();
+      const alpha = currentAlpha() * (visible > 0 ? 1 : 0);
       const sc = currentScale();
       const yaw = currentYaw();
       const m = {
@@ -775,73 +979,70 @@
         cy: Math.cos(yaw), sy: Math.sin(yaw),
         cz: Math.cos(state.tiltZ), sz: Math.sin(state.tiltZ)
       };
-      for (let i = 0; i < brain.count; i++) {
-        projectPoint(brain.positions[i * 3], brain.positions[i * 3 + 1], brain.positions[i * 3 + 2], sc, m, projected, i * 3);
+      for (let i = 0; i < visible; i++) {
+        const s = slotOfMemory(i, cap);
+        projectPoint(brain.cur[s * 3], brain.cur[s * 3 + 1], brain.cur[s * 3 + 2], sc, m, projected, i * 3);
       }
 
-      if (state.anchorIds.length) {
-        const nodes = state.anchorIds.map(id => {
-          const i = anchorIndex(id, brain.surfaceCount);
-          const x = brain.positions[i * 3], y = brain.positions[i * 3 + 1], z = brain.positions[i * 3 + 2];
+      if (visible > 0) {
+        const nodes = [];
+        for (let i = 0; i < visible; i++) {
+          const s = slotOfMemory(i, cap);
+          const x = brain.cur[s * 3], y = brain.cur[s * 3 + 1], z = brain.cur[s * 3 + 2];
           const x1 = x * m.cz - y * m.sz, y1 = x * m.sz + y * m.cz;
           const x2 = x1 * m.cy + z * m.sy, z2 = -x1 * m.sy + z * m.cy;
           const y3 = y1 * m.cx - z2 * m.sx, z3 = y1 * m.sx + z2 * m.cx;
-          return { id, x: projected[i * 3], y: projected[i * 3 + 1], front: z3 * sc };
-        });
+          nodes.push({ id: state.ids[i], x: projected[i * 3], y: projected[i * 3 + 1], front: z3 * sc });
+        }
         document.dispatchEvent(new CustomEvent('braindump:project', { detail: { nodes } }));
       }
 
       ctx.clearRect(0, 0, w, h);
+      if (visible === 0) return;
       ctx.globalCompositeOperation = 'lighter';
 
-      /* glow + core */
-      const glowR = pxPerUnit * (1.25 + state.pulse * 0.35);
+      /* warmth behind the network */
+      const density = Math.min(1, visible / 24);
+      const glowR = pxPerUnit * (1.05 + 0.4 * density + state.pulse * 0.35);
       const glowColor = mix([0.72, 0.66, 0.56], state.pulseColor, Math.min(1, state.pulse));
       const glowGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-      glowGradient.addColorStop(0, rgba(glowColor, (0.16 + state.pulse * 0.4) * alpha));
-      glowGradient.addColorStop(0.45, rgba(glowColor, 0.08 * alpha));
+      glowGradient.addColorStop(0, rgba(glowColor, (0.05 + 0.11 * density + state.pulse * 0.4) * alpha));
+      glowGradient.addColorStop(0.45, rgba(glowColor, 0.05 * alpha));
       glowGradient.addColorStop(1, rgba(glowColor, 0));
       ctx.fillStyle = glowGradient;
       ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
-      const coreR = pxPerUnit * (0.42 + state.pulse * 0.12);
-      const coreGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGradient.addColorStop(0, rgba(PALETTE.slate, (0.18 + state.pulse * 0.4) * alpha));
-      coreGradient.addColorStop(1, rgba(PALETTE.slate, 0));
-      ctx.fillStyle = coreGradient;
-      ctx.fillRect(cx - coreR, cy - coreR, coreR * 2, coreR * 2);
 
-      /* synapses — grouped into four depth buckets to limit state changes */
-      const linkCount = brain.pairs.length / 2;
+      /* synapses */
       ctx.lineWidth = 1;
-      for (let bucket = 0; bucket < 4; bucket++) {
-        ctx.strokeStyle = rgba([0.72, 0.67, 0.58], (0.05 + bucket * 0.05) * (1 + state.pulse * 0.9) * alpha);
-        ctx.beginPath();
-        for (let l = 0; l < linkCount; l++) {
-          const a = brain.pairs[l * 2] * 3, b = brain.pairs[l * 2 + 1] * 3;
-          const depth = (projected[a + 2] + projected[b + 2]) / 2;
-          const bkt = clamp(Math.floor((depth - 0.72) / 0.14), 0, 3);
-          if (bkt !== bucket) continue;
-          ctx.moveTo(projected[a], projected[a + 1]);
-          ctx.lineTo(projected[b], projected[b + 1]);
-        }
-        ctx.stroke();
+      ctx.strokeStyle = rgba([0.74, 0.68, 0.56], (0.16 + state.pulse * 0.15) * alpha);
+      ctx.beginPath();
+      for (let i = 1; i < visible; i++) {
+        // slots and memory indices coincide while i < cap, so the parent is already projected
+        const pi = i < cap && brain.parent[i] >= 0 ? brain.parent[i] : i - 1;
+        ctx.moveTo(projected[i * 3], projected[i * 3 + 1]);
+        ctx.lineTo(projected[pi * 3], projected[pi * 3 + 1]);
       }
+      ctx.stroke();
 
       /* neurons */
       const t = state.time;
-      for (let i = 0; i < brain.count; i++) {
+      for (let i = 0; i < visible; i++) {
+        const s = slotOfMemory(i, cap);
         const depth = projected[i * 3 + 2];
-        const tw = 0.72 + 0.28 * Math.sin(t * 1.7 + brain.phases[i] * 6.28318);
-        const r = brain.sizes[i] * pointPx * depth * (1 + state.pulse * 0.4) * 1.15;
-        ctx.globalAlpha = clamp(0.8 * tw * alpha * clamp((depth - 0.55) / 0.7, 0.3, 1), 0, 1);
-        ctx.drawImage(sprites[brain.classes[i]], projected[i * 3] - r, projected[i * 3 + 1] - r, r * 2, r * 2);
+        const fl = brain.flash[s];
+        const sel = s === state.selected;
+        const tw = 0.72 + 0.28 * Math.sin(t * 1.7 + brain.phases[s] * 6.28318);
+        const r = brain.sizes[s] * pointPx * depth * (1 + fl * 1.1 + (sel ? 0.5 : 0)) * (1 + state.pulse * 0.4) * 1.2;
+        ctx.globalAlpha = clamp(0.9 * tw * alpha * clamp((depth - 0.55) / 0.7, 0.35, 1) * slotAlpha(s, visible), 0, 1);
+        ctx.drawImage(fl > 0.02 || sel ? sprites[2] : sprites[brain.cls[s]], projected[i * 3] - r, projected[i * 3 + 1] - r, r * 2, r * 2);
       }
 
       /* signals */
-      for (const s of signals) {
-        signalPosition(s, brain.positions, tmp, 0);
+      const wantedSignals = clamp(Math.floor(visible / 2), 0, SIGNALS);
+      for (let i = 0; i < wantedSignals; i++) {
+        signalPosition(signals[i], brain.cur, tmp, 0);
         projectPoint(tmp[0], tmp[1], tmp[2], sc, m, tmp, 0);
-        const r = pointPx * 2.2 * tmp[2];
+        const r = pointPx * 2.1 * tmp[2];
         ctx.globalAlpha = 0.9 * alpha;
         ctx.drawImage(whiteSprite, tmp[0] - r, tmp[1] - r, r * 2, r * 2);
       }
@@ -877,6 +1078,16 @@
      ------------------------------------------------------------------ */
   const api = {
     get mode() { return state.mode; },
+    get debug() {
+      return {
+        mode: state.mode,
+        memories: state.ids.length,
+        visible: structure ? visibleCount(structure) : 0,
+        yaw: state.rotY + state.yawOffset,
+        tilt: state.tiltX,
+        dragging: state.drag.active
+      };
+    },
     pulse(color, strength = 1) {
       state.pulseColor = PALETTE[color] || PALETTE.ember;
       animatePulse(clamp(strength, 0.1, 2));
@@ -889,33 +1100,41 @@
     },
     nudge(amount = 1) { state.boost += 1.4 * amount; },
     face(id) {
-      if (!activeRenderer || !activeRenderer.brain || id == null) return;
-      const brain = activeRenderer.brain;
-      const i = anchorIndex(id, brain.surfaceCount) * 3;
-      const x = brain.positions[i], z = brain.positions[i + 2];
-      if (Math.hypot(x, z) < 0.02) return; // already centered on the axis
-      const target = Math.atan2(-x, z);
-      let delta = target - state.rotY;
-      delta = ((delta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-      state.targetYaw = clamp(state.targetYaw - delta, -0.9, 0.9) + delta; // follow within parallax range
-      state.targetYaw = target - state.rotY; // absolute yaw, springs via yawOffset
-      state.targetYaw = clamp(state.targetYaw, -Math.PI, Math.PI);
+      if (!structure || id == null) return;
+      const s = state.idToSlot.get(id);
+      if (s == null) return;
+      const x = structure.positions[s * 3], z = structure.positions[s * 3 + 2], y = structure.positions[s * 3 + 1];
+      if (Math.hypot(x, z) > 0.02) {
+        // bring the node to the camera-facing meridian
+        const delta = Math.atan2(-x, z) - state.rotY;
+        state.targetYaw = ((delta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      }
+      state.targetTiltX = clamp(0.18 + y * 0.55, -0.42, 0.8);
     },
     setFocus(active) {
-      state.targetFocus = active ? 0.42 : 1;
-      state.activity = active ? 0.6 : 1;
+      state.targetFocus = active ? 0.62 : 1;
+      state.activity = active ? 0.75 : 1;
     },
-    setActivity(level) { state.activity = clamp(Number(level) || 1, 0.2, 2); },
-    setTransform(x, y, zoom) {
-      const target = document.getElementById('brain-field') || layer;
-      target.style.transform = `translate(${x || 0}px, ${y || 0}px) scale(${(zoom || 100) / 100})`;
-    }
+    setActivity(level) { state.activity = clamp(Number(level) || 1, 0.2, 2); }
   };
   window.BrainDump3D = api;
 
-  document.addEventListener('braindump:anchors', event => { state.anchorIds = ((event.detail || {}).ids || []).slice(); });
+  document.addEventListener('braindump:anchors', event => { applyAnchors(((event.detail || {}).ids || [])); });
+  document.addEventListener('braindump:select', event => {
+    const id = (event.detail || {}).id;
+    state.selectedId = id;
+    state.selected = id == null ? -1 : (state.idToSlot.get(id) ?? -1);
+    state.dirty = true;
+  });
+  document.addEventListener('braindump:dim', event => {
+    const ids = (event.detail || {}).ids;
+    if (!ids || !ids.length) { state.dim = null; state.dirty = true; return; }
+    const set = new Set();
+    for (const id of ids) { const s = state.idToSlot.get(id); if (s != null) set.add(s); }
+    state.dim = set;
+    state.dirty = true;
+  });
   document.addEventListener('braindump:face', event => { api.face((event.detail || {}).id); });
-  document.addEventListener('braindump:transform', event => { const d = event.detail || {}; api.setTransform(d.x, d.y, d.zoom); });
   document.addEventListener('braindump:pulse', event => { const d = event.detail || {}; api.pulse(d.color, d.strength ?? 1); });
   document.addEventListener('braindump:burst', event => { api.burst((event.detail || {}).color); });
   document.addEventListener('braindump:focus', event => { api.setFocus(Boolean((event.detail || {}).active)); });
@@ -958,6 +1177,7 @@
         const THREE = await loadThree();
         activeRenderer = startWebGL(THREE);
         setMode('webgl');
+        applyAnchors(state.ids);
         runIntro();
         return;
       } catch (error) {
@@ -968,6 +1188,7 @@
     try {
       activeRenderer = start2D();
       setMode('2d');
+      applyAnchors(state.ids);
       runIntro();
     } catch (error) {
       console.warn('[BrainDump] 2D brain unavailable, using the CSS core →', error && error.message);
