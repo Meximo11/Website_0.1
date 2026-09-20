@@ -44,6 +44,7 @@ expose them to a specific tool as well (for example `.claude/skills/`), run
 | `minimalist-ui` | Leonxlnx/taste-skill | warm editorial monochrome, flat grids, no gradient noise |
 | `frontend-design` | [anthropics/skills](https://github.com/anthropics/skills) | Anthropic's guidance for distinctive, intentional visual design |
 | `stop-slop` | [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) | strip AI writing patterns from copy, docs and commit messages |
+| `3d-web-experience` | [ai4brands-design/claude-skills](https://github.com/ai4brands-design/claude-skills/blob/master/3d-web-experience/SKILL.md) | 3D stack choice, model pipeline, scroll-driven 3D, WebGL performance and the "no 3D for 3D's sake" rules (relevant whenever the brain stage grows) |
 | `playwright-cli` | [@playwright/cli](https://www.npmjs.com/package/@playwright/cli) | drive a real browser: snapshots, clicks, screenshots, traces, test generation |
 | `graphify` | [safishamsi/graphify](https://github.com/safishamsi/graphify) | build and query a knowledge graph of the codebase (`/graphify .`, then `graphify query ...`) |
 | `last30days` | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) | research what people said about a topic in the last 30 days (Reddit, X, YouTube, HN, web) |
@@ -59,6 +60,9 @@ Notes on the vendored copies:
 - HyperFrames workflow skills (`pr-to-video`, `slideshow`, `product-launch-video`,
   ...) are not vendored; the router runs `npx hyperframes skills update <workflow>`
   when a brief needs one.
+- `3d-web-experience` is vendored by hand from that blob (the source repo has no
+  skills-CLI root), so it has no `skills-lock.json` entry; refresh it by re-copying
+  the file.
 - `last30days` ships without its 14 MB of demo media and its dev/eval scripts (the
   ones listed in the skill's own `.skillignore`). It works with web search alone
   and gets better with the optional API keys documented in its `SKILL.md`.
